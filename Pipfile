@@ -9,6 +9,8 @@ requests = "*"
 pandas = "*"
 langdetect = "*"
 ebooklib = "*"
+openai = "*"
+python-dotenv = "*"
 
 [dev-packages]
 ipykernel = "*"
