@@ -1,4 +1,4 @@
 .env
 **/*.csv
 *.csv
-quotes.csv
+.DS_Store

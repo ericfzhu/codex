@@ -11,6 +11,7 @@ langdetect = "*"
 ebooklib = "*"
 openai = "*"
 python-dotenv = "*"
+pinecone-client = "*"
 
 [dev-packages]
 ipykernel = "*"
