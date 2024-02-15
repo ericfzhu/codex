@@ -18,13 +18,23 @@ export default function GridItem({ id, metadata, originalPosition, shuffledPosit
 	const [isHovered, setIsHovered] = useState(false);
 
 	return (
-		<div className={`relative col-span-1 row-span-1 border border-accent2`} style={style} onMouseOver={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
+		<div
+			className={`relative col-span-1 row-span-1 border border-accent2`}
+			style={style}
+			onMouseOver={() => setIsHovered(true)}
+			onMouseLeave={() => setIsHovered(false)}>
 			<div className="relative z-10 h-full w-full">
 				{isLink && (
 					<Link href="/cloud" className="block h-full w-full p-5 justify-between flex flex-col text-accent">
 						<p>Explore memetic cloud</p>
 						<div className="w-full h-full relative">
-							<Image src="/cloud.png" alt="" layout="fill" objectFit="contain" className={`p-2 duration-300 ${isHovered ? 'opacity-100' : 'opacity-50'}`} />
+							<Image
+								src="/cloud.png"
+								alt=""
+								layout="fill"
+								objectFit="contain"
+								className={`p-2 duration-300 ${isHovered ? 'opacity-100' : 'opacity-50'}`}
+							/>
 						</div>
 						<div className="text-right">codex/cloud</div>
 					</Link>

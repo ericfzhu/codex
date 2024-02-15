@@ -3,13 +3,13 @@ import Head from 'next/head';
 import { Pinecone } from '@pinecone-database/pinecone';
 import GridItem from '@/components/GridItem';
 import { Metadata } from '@/types';
-import { JetBrains_Mono } from 'next/font/google'
+import { JetBrains_Mono } from 'next/font/google';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
 
 const jetBrainsMono = JetBrains_Mono({
-    subsets: ['latin'],
-})
+	subsets: ['latin'],
+});
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
 	const pinecone = new Pinecone({
@@ -57,7 +57,8 @@ export default function IndexPage({ quote, neighbors }: { quote: Metadata; neigh
 				<meta property="twitter:url" content="http://codex.ericfzhu.com/" />
 				<meta name="twitter:title" content={'Codex'} />
 			</Head>
-			<div className={`grid grid-cols-3 lg:grid-cols-4 grid-rows-2 lg:grid-rows-3 max-h-screen h-full overflow-hidden ${jetBrainsMono.className}`}>
+			<div
+				className={`grid grid-cols-3 lg:grid-cols-4 grid-rows-2 lg:grid-rows-3 max-h-screen h-full overflow-hidden ${jetBrainsMono.className}`}>
 				<div className="flex flex-col p-5 bg-accent text-white">
 					<p className={`text-left whitespace-pre-line flex-grow overflow-auto`}>{quote.quote}</p>
 					<div className="flex w-full justify-end pt-2">
@@ -76,15 +77,17 @@ export default function IndexPage({ quote, neighbors }: { quote: Metadata; neigh
 				<GridItem id={-1} originalPosition={0} shuffledPosition={0} isLink={true} />
 
 				<div className="col-span-1 row-span-1 bg-accent p-5 text-white flex flex-col gap-3 text-xl">
-                    <Link href="ericfzhu.com">Home</Link>
-                    <Link href="ericfzhu.com">Github</Link>
-                    <Link
-                        href={'ericfzhu.com/?windows=works&fs=works'}
-                        className="hover:text-accent duration-300"
-                    >
-                        Works
-                    </Link>
-                </div>
+					<Link href="https://ericfzhu.com" className="hover:text-black duration-300">
+						Home
+					</Link>
+					<Link href="https://github.com/ericfzhu/codex" className="hover:text-black duration-300">
+						Github
+					</Link>
+					<Link href={'https://ericfzhu.com/?windows=works&fs=works'} className="hover:text-black duration-300">
+						Works
+					</Link>
+					<button className="opacity-50 text-left disabled">Shuffle</button>
+				</div>
 				{/* <div className="col-span-1 row-span-1 border border-accent2"></div>
 				<div className="col-span-1 row-span-1 border border-accent2"></div> */}
 			</div>
