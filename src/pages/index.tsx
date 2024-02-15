@@ -58,8 +58,8 @@ export default function IndexPage({ quote, neighbors }: { quote: Metadata; neigh
 				<meta name="twitter:title" content={'Codex'} />
 			</Head>
 			<div className={`grid grid-cols-3 lg:grid-cols-4 grid-rows-2 lg:grid-rows-3 max-h-screen h-full overflow-hidden ${jetBrainsMono.className}`}>
-				<div className="flex flex-col gap-12 p-5 bg-accent text-white">
-					<p className={`text-left whitespace-pre-line flex-grow`}>{quote.quote}</p>
+				<div className="flex flex-col p-5 bg-accent text-white">
+					<p className={`text-left whitespace-pre-line flex-grow overflow-auto`}>{quote.quote}</p>
 					<div className="flex w-full justify-end pt-2">
 						<div>
 							{quote.author && <p>{quote.author}</p>}
