@@ -8,3 +8,10 @@ export interface DataItem {
 export interface VisualizationProps {
 	data: DataItem[];
 }
+
+export type Metadata = {
+	quote: string;
+	author: string;
+	book_title: string;
+	score?: number;
+};

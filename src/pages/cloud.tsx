@@ -1,4 +1,4 @@
-import Visualization from '@/components/visualization';
+import Visualization from '@/components/Visualization';
 
 import { GetStaticProps } from 'next';
 import fs from 'fs';
