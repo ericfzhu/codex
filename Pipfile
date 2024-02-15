@@ -12,6 +12,7 @@ ebooklib = "*"
 openai = "*"
 python-dotenv = "*"
 pinecone-client = "*"
+umap-learn = "*"
 
 [dev-packages]
 ipykernel = "*"
