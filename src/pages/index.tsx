@@ -72,7 +72,15 @@ export default function IndexPage({ quote, neighbors }: { quote: Metadata; neigh
 					.filter((neighbor: { metadata: Metadata; score: number }) => neighbor.metadata.quote !== quote.quote)
 					.map((neighbor: { metadata: Metadata; score: number; id: number }, index: number) => {
 						neighbor.metadata.score = neighbor.score;
-						return <GridItem id={neighbor.id} metadata={neighbor.metadata} originalPosition={index + 1} shuffledPosition={index + 1} key={index}/>;
+						return (
+							<GridItem
+								id={neighbor.id}
+								metadata={neighbor.metadata}
+								originalPosition={index + 1}
+								shuffledPosition={index + 1}
+								key={index}
+							/>
+						);
 					})}
 				<GridItem id={-1} originalPosition={0} shuffledPosition={0} isLink={true} />
 
