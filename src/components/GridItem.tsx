@@ -1,42 +1,40 @@
 import { Metadata } from '@/types';
+import { IconArrowUpRight } from '@tabler/icons-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { CSSProperties, useState } from 'react';
+import { useState } from 'react';
 
 interface GridItemProps {
 	id?: number;
 	metadata?: Metadata;
-	originalPosition: number;
-	shuffledPosition: number;
 	isLink?: boolean;
 }
 
-export default function GridItem({ id, metadata, originalPosition, shuffledPosition, isLink = false }: GridItemProps) {
-	const style: CSSProperties = {
-		transform: `translate(${calculateTranslateValue(shuffledPosition, originalPosition)})`,
-	};
+export default function GridItem({ id, metadata, isLink = false }: GridItemProps) {
 	const [isHovered, setIsHovered] = useState(false);
 
 	return (
 		<div
-			className={`relative col-span-1 row-span-1 border border-accent2`}
-			style={style}
+			className={`relative col-span-1 row-span-1 border border-accent2 duration-300 hover:bg-accent hover:text-white`}
 			onMouseOver={() => setIsHovered(true)}
 			onMouseLeave={() => setIsHovered(false)}>
 			<div className="relative z-10 h-full w-full">
 				{isLink && (
-					<Link href="/cloud" className="block h-full w-full p-5 justify-between flex flex-col text-accent">
+					<Link href="/cloud" className="block h-full w-full p-5 justify-between flex flex-col">
 						<p>Explore memetic cloud</p>
 						<div className="w-full h-full relative">
 							<Image
 								src="/cloud.png"
 								alt=""
-								layout="fill"
-								objectFit="contain"
-								className={`p-2 duration-300 ${isHovered ? 'opacity-100' : 'opacity-50'}`}
+								width={500}
+								height={500}
+								className={`p-2 duration-300 ${isHovered ? 'opacity-100' : 'opacity-50'} w-full`}
 							/>
 						</div>
-						<div className="text-right">codex/cloud</div>
+						<div className="flex justify-end items-center pt-2">
+							<p>codex/cloud</p>
+							<IconArrowUpRight />
+						</div>
 					</Link>
 				)}
 				{metadata && (
@@ -54,12 +52,4 @@ export default function GridItem({ id, metadata, originalPosition, shuffledPosit
 			</div>
 		</div>
 	);
-}
-
-function calculateTranslateValue(shuffledPosition: number, originalPosition: number): string {
-	// Calculate the X and Y translate values based on the grid's geometry
-	// For example, if your grid has 3 columns, you can calculate the X offset as follows:
-	const xOffset = ((shuffledPosition % 3) - (originalPosition % 3)) * 100; // Assuming each grid cell is 100% of the grid item's width
-	const yOffset = (Math.floor(shuffledPosition / 3) - Math.floor(originalPosition / 3)) * 100; // Assuming each grid cell is 100% of the grid item's height
-	return `${xOffset}%, ${yOffset}%`;
 }

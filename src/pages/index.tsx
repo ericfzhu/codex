@@ -78,28 +78,24 @@ export default function IndexPage({ quote, neighbors }: { quote: Metadata; neigh
 							<GridItem
 								id={neighbor.id}
 								metadata={neighbor.metadata}
-								originalPosition={index + 1}
-								shuffledPosition={index + 1}
 								key={index}
 							/>
 						);
 					})}
-				<GridItem id={-1} originalPosition={0} shuffledPosition={0} isLink={true} />
+				<GridItem id={-1} isLink={true} />
 
 				<div className="col-span-1 row-span-1 bg-accent p-5 text-white flex flex-col gap-3 text-xl">
-					<Link href="https://ericfzhu.com" className="hover:text-black duration-300">
+					<Link href="https://ericfzhu.com" target='_blank' className="hover:text-black duration-300">
 						Home
 					</Link>
-					<Link href="https://github.com/ericfzhu/codex" className="hover:text-black duration-300">
+					<Link href="https://github.com/ericfzhu/codex" target='_blank' className="hover:text-black duration-300">
 						Github
 					</Link>
-					<Link href={'https://ericfzhu.com/?windows=works&fs=works'} className="hover:text-black duration-300">
+					<Link href={'https://ericfzhu.com/?windows=works&fs=works'} target='_blank' className="hover:text-black duration-300">
 						Works
 					</Link>
-					<button className="opacity-50 text-left disabled">Shuffle</button>
+					<span className='text-sm mt-auto'>Click on a tile to see neighbors</span>
 				</div>
-				{/* <div className="col-span-1 row-span-1 border border-accent2"></div>
-				<div className="col-span-1 row-span-1 border border-accent2"></div> */}
 			</div>
 		</main>
 	);
