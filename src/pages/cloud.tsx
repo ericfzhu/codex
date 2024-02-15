@@ -1,4 +1,4 @@
-import Visualization from '@/components/Visualization';
+import Cloud from '@/components/Cloud';
 
 import { GetStaticProps } from 'next';
 import fs from 'fs';
@@ -11,7 +11,7 @@ export default function VisualizePage({ data }: VisualizationProps) {
 	return (
 		<main>
 			<div className="flex flex-col items-center">
-				<Visualization data={data} />
+				<Cloud data={data} />
 			</div>
 		</main>
 	);

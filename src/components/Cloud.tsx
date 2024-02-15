@@ -4,7 +4,7 @@ import { Raycaster, Vector2 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { VisualizationProps, DataItem } from '@/types';
 
-export default function Visualization({ data }: VisualizationProps) {
+export default function Cloud({ data }: VisualizationProps) {
 	const mountRef = useRef<HTMLDivElement>(null);
 	const raycaster = new Raycaster();
 	const mouse = new Vector2();
