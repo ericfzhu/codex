@@ -11,7 +11,7 @@
 		"prettier": "prettier --write ."
 	},
 	"engines": {
-		"node": "21"
+		"node": "20.x"
 	},
 	"dependencies": {
 		"@pinecone-database/pinecone": "^2.0.1",
