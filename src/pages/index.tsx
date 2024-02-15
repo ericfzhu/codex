@@ -11,6 +11,8 @@ const jetBrainsMono = JetBrains_Mono({
 	subsets: ['latin'],
 });
 
+export const runtime = 'experimental-edge'
+
 export const getServerSideProps: GetServerSideProps = async (context) => {
 	const pinecone = new Pinecone({
 		apiKey: process.env.PINECONE_API_KEY!,
