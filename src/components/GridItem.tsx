@@ -20,12 +20,11 @@ export default function GridItem({ id, metadata, isLink = false, color }: GridIt
 
 	return (
 		<div
-			className={`relative col-span-1 row-span-1 border ${color.border} duration-300 ${color.hoverbg} hover:text-white`}
+			className={`relative col-span-1 row-span-1 border ${color.border} duration-300 ${color.hoverbg} hover:text-white max-h-full h-full min-h-52`}
 			onMouseOver={() => setIsHovered(true)}
 			onMouseLeave={() => setIsHovered(false)}>
-			<div className="relative z-10 h-full w-full">
 				{isLink && (
-					<Link href="/cloud" className="block h-full w-full p-5 justify-between flex flex-col">
+					<Link href="/cloud" className="block h-full w-full p-2 md:p-5 justify-between flex flex-col">
 						<p>Explore memetic cloud</p>
 						<div className="w-full h-full relative">
 							<Image
@@ -43,9 +42,9 @@ export default function GridItem({ id, metadata, isLink = false, color }: GridIt
 					</Link>
 				)}
 				{metadata && (
-					<Link href={`/?id=${id}`} className="text-sm p-5 flex flex-col justify-between h-full">
-						<p className="whitespace-pre-line flex-grow overflow-auto">{metadata.quote}</p>
-						<div className="flex justify-between items-end shrink-0 pt-2">
+					<Link href={`/?id=${id}`} className="text-sm p-2 md:p-5 flex flex-col justify-between h-full">
+						<p className="whitespace-normal overflow-scroll flex-grow">{metadata.quote}</p>
+						<div className="flex justify-between items-end shrink-0 pt-2 shrink-0">
 							<div className="text-left">{metadata.score && <p>{metadata.score.toFixed(3)}</p>}</div>
 							<div className="text-right">
 								{metadata.author && <p>{metadata.author}</p>}
@@ -54,7 +53,6 @@ export default function GridItem({ id, metadata, isLink = false, color }: GridIt
 						</div>
 					</Link>
 				)}
-			</div>
 		</div>
 	);
 }

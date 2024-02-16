@@ -78,14 +78,18 @@ export default function IndexPage({ quote, neighbors }: { quote: Metadata; neigh
 			bg: 'bg-[#EE6A20]',
 			hoverbg: 'hover:bg-[#EE6A20]',
 			border: 'border-[#FDD5A5]'
+		},
+		{
+			bg: 'bg-[#70A3F2]',
+			hoverbg: 'hover:bg-[#70A3F2]',
+			border: 'border-[#ADC8FF]'
 		}
 	]
 	const randomColor = colors[Math.floor(Math.random() * colors.length)];
-
 	const [elementsOrder, setElementsOrder] = useState(initialElements);
 
 	return (
-		<main className="items-center flex flex-col bg-white h-screen overflow-auto">
+		<main className="bg-white h-screen overflow-hidden">
 			<Head>
 				<title>Codex</title>
 				<meta property={'og:title'} content={'Codex'} key="title" />
@@ -101,14 +105,14 @@ export default function IndexPage({ quote, neighbors }: { quote: Metadata; neigh
 			</Head>
 
 			<div
-				className={`grid grid-cols-3 lg:grid-cols-4 grid-rows-2 lg:grid-rows-3 max-h-screen h-full overflow-hidden ${jetBrainsMono.className}`}>
+				className={`grid grid-cols-1 md:grid-cols-4 md:grid-rows-3 max-h-fit h-screen overflow-scroll md:overflow-hidden ${jetBrainsMono.className}`}>
 				{elementsOrder.map((element) => {
 					if (element === 'quote') {
 						return (
-							<div className={`flex flex-col p-5 ${randomColor.bg} text-white`} key={element}>
+							<div className={`flex flex-col p-2 md:p-5 ${randomColor.bg} text-white h-[100%] text-sm`} key={element}>
 								<p className={`text-left whitespace-pre-line flex-grow overflow-auto`}>{quote.quote}</p>
 								<div className="flex w-full justify-end pt-2">
-									<div>
+									<div className='text-right'>
 										{quote.author && <p>{quote.author}</p>}
 										{quote.book_title && <i>{quote.book_title}</i>}
 									</div>
@@ -122,7 +126,7 @@ export default function IndexPage({ quote, neighbors }: { quote: Metadata; neigh
 						return <GridItem id={neighbor.id} metadata={neighbor.metadata} key={element} color={randomColor}/>;
 					} else if (element === 'links') {
 						return (
-							<div className={`col-span-1 row-span-1 ${randomColor.bg} p-5 text-white flex flex-col gap-3 text-xl`} key={element}>
+							<div className={`col-span-1 row-span-1 ${randomColor.bg} p-2 md:p-5 text-white flex flex-col gap-3 text-normal md:text-xl h-[100%]`} key={element}>
 								<Link href="https://ericfzhu.com" target="_blank" className="hover:text-black duration-300">
 									Home
 								</Link>
@@ -148,7 +152,7 @@ export default function IndexPage({ quote, neighbors }: { quote: Metadata; neigh
 
 			{/* 
 			<div
-				className={`grid grid-cols-3 lg:grid-cols-4 grid-rows-2 lg:grid-rows-3 max-h-screen h-full overflow-hidden ${jetBrainsMono.className}`}>
+				className={`grid grid-cols-3 md:grid-cols-4 grid-rows-2 md:grid-rows-3 max-h-screen h-full overflow-hidden ${jetBrainsMono.className}`}>
 				<div className="flex flex-col p-5 bg-accent text-white">
 					<p className={`text-left whitespace-pre-line flex-grow overflow-auto`}>{quote.quote}</p>
 					<div className="flex w-full justify-end pt-2">
