@@ -8,14 +8,19 @@ interface GridItemProps {
 	id?: number;
 	metadata?: Metadata;
 	isLink?: boolean;
+	color: {
+		bg: string;
+		hoverbg: string;
+		border: string
+	}
 }
 
-export default function GridItem({ id, metadata, isLink = false }: GridItemProps) {
+export default function GridItem({ id, metadata, isLink = false, color }: GridItemProps) {
 	const [isHovered, setIsHovered] = useState(false);
 
 	return (
 		<div
-			className={`relative col-span-1 row-span-1 border border-accent2 duration-300 hover:bg-accent hover:text-white`}
+			className={`relative col-span-1 row-span-1 border ${color.border} duration-300 ${color.hoverbg} hover:text-white`}
 			onMouseOver={() => setIsHovered(true)}
 			onMouseLeave={() => setIsHovered(false)}>
 			<div className="relative z-10 h-full w-full">
