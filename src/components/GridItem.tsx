@@ -11,8 +11,8 @@ interface GridItemProps {
 	color: {
 		bg: string;
 		hoverbg: string;
-		border: string
-	}
+		border: string;
+	};
 }
 
 export default function GridItem({ id, metadata, isLink = false, color }: GridItemProps) {
@@ -23,36 +23,36 @@ export default function GridItem({ id, metadata, isLink = false, color }: GridIt
 			className={`relative col-span-1 row-span-1 border ${color.border} duration-300 ${color.hoverbg} hover:text-white max-h-full h-full min-h-52`}
 			onMouseOver={() => setIsHovered(true)}
 			onMouseLeave={() => setIsHovered(false)}>
-				{isLink && (
-					<Link href="/cloud" className="block h-full w-full p-2 md:p-5 justify-between flex flex-col">
-						<p>Explore memetic cloud</p>
-						<div className="w-full h-full relative">
-							<Image
-								src="/cloud.png"
-								alt=""
-								width={500}
-								height={500}
-								className={`p-2 duration-300 ${isHovered ? 'opacity-100' : 'opacity-50'} w-full`}
-							/>
+			{isLink && (
+				<Link href="/cloud" className="block h-full w-full p-2 md:p-5 justify-between flex flex-col">
+					<p>Explore memetic cloud</p>
+					<div className="w-full h-full relative">
+						<Image
+							src="/cloud.png"
+							alt=""
+							width={500}
+							height={500}
+							className={`p-2 duration-300 ${isHovered ? 'opacity-100' : 'opacity-50'} w-full`}
+						/>
+					</div>
+					<div className="flex justify-end items-center pt-2">
+						<p>codex/cloud</p>
+						<IconArrowUpRight />
+					</div>
+				</Link>
+			)}
+			{metadata && (
+				<Link href={`/?id=${id}`} className="text-sm p-2 md:p-5 flex flex-col justify-between h-full">
+					<p className="whitespace-normal overflow-scroll flex-grow">{metadata.quote}</p>
+					<div className="flex justify-between items-end shrink-0 pt-2 shrink-0">
+						<div className="text-left">{metadata.score && <p>{metadata.score.toFixed(3)}</p>}</div>
+						<div className="text-right">
+							{metadata.author && <p>{metadata.author}</p>}
+							{metadata.book_title && <i>{metadata.book_title}</i>}
 						</div>
-						<div className="flex justify-end items-center pt-2">
-							<p>codex/cloud</p>
-							<IconArrowUpRight />
-						</div>
-					</Link>
-				)}
-				{metadata && (
-					<Link href={`/?id=${id}`} className="text-sm p-2 md:p-5 flex flex-col justify-between h-full">
-						<p className="whitespace-normal overflow-scroll flex-grow">{metadata.quote}</p>
-						<div className="flex justify-between items-end shrink-0 pt-2 shrink-0">
-							<div className="text-left">{metadata.score && <p>{metadata.score.toFixed(3)}</p>}</div>
-							<div className="text-right">
-								{metadata.author && <p>{metadata.author}</p>}
-								{metadata.book_title && <i>{metadata.book_title}</i>}
-							</div>
-						</div>
-					</Link>
-				)}
+					</div>
+				</Link>
+			)}
 		</div>
 	);
 }

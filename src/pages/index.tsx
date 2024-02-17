@@ -37,13 +37,15 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 	const metadata = response.metadata;
 
 	const uniqueQuotes = new Set();
-	secondResponse = secondResponse.filter((match) => {
-		if (match.metadata!.quote !== metadata!.quote && !uniqueQuotes.has(match.metadata!.quote)) {
-			uniqueQuotes.add(match.metadata!.quote);
-			return true;
-		}
-		return false;
-	}).slice(0, 10);
+	secondResponse = secondResponse
+		.filter((match) => {
+			if (match.metadata!.quote !== metadata!.quote && !uniqueQuotes.has(match.metadata!.quote)) {
+				uniqueQuotes.add(match.metadata!.quote);
+				return true;
+			}
+			return false;
+		})
+		.slice(0, 9);
 
 	return {
 		props: {
@@ -62,29 +64,29 @@ function shuffleArray(array: string[]) {
 }
 
 export default function IndexPage({ quote, neighbors }: { quote: Metadata; neighbors: { metadata: Metadata; score: number; id: number }[] }) {
-	const initialElements = ['quote', ...neighbors.map((n, index) => `neighbor-${index}`), 'links', 'cloud'];
+	const initialElements = ['quote', ...neighbors.map((n, index) => `neighbor-${index}`), 'cloud', 'links'];
 	const colors = [
 		{
 			bg: 'bg-[#7070FF]',
 			hoverbg: 'hover:bg-[#7070FF]',
-			border: 'border-[#C5C5FF]'
+			border: 'border-[#C5C5FF]',
 		},
 		{
 			bg: 'bg-[#8BDB50]',
 			hoverbg: 'hover:bg-[#8BDB50]',
-			border: 'border-[#E1FBBB]'
+			border: 'border-[#E1FBBB]',
 		},
 		{
 			bg: 'bg-[#EE6A20]',
 			hoverbg: 'hover:bg-[#EE6A20]',
-			border: 'border-[#FDD5A5]'
+			border: 'border-[#FDD5A5]',
 		},
 		{
 			bg: 'bg-[#70A3F2]',
 			hoverbg: 'hover:bg-[#70A3F2]',
-			border: 'border-[#ADC8FF]'
-		}
-	]
+			border: 'border-[#ADC8FF]',
+		},
+	];
 	const randomColor = colors[Math.floor(Math.random() * colors.length)];
 	const [elementsOrder, setElementsOrder] = useState(initialElements);
 
@@ -112,7 +114,7 @@ export default function IndexPage({ quote, neighbors }: { quote: Metadata; neigh
 							<div className={`flex flex-col p-2 md:p-5 ${randomColor.bg} text-white h-[100%] text-sm`} key={element}>
 								<p className={`text-left whitespace-pre-line flex-grow overflow-auto`}>{quote.quote}</p>
 								<div className="flex w-full justify-end pt-2">
-									<div className='text-right'>
+									<div className="text-right">
 										{quote.author && <p>{quote.author}</p>}
 										{quote.book_title && <i>{quote.book_title}</i>}
 									</div>
@@ -123,10 +125,12 @@ export default function IndexPage({ quote, neighbors }: { quote: Metadata; neigh
 						const index = parseInt(element.split('-')[1]);
 						const neighbor = neighbors[index];
 						neighbor.metadata.score = neighbor.score;
-						return <GridItem id={neighbor.id} metadata={neighbor.metadata} key={element} color={randomColor}/>;
+						return <GridItem id={neighbor.id} metadata={neighbor.metadata} key={element} color={randomColor} />;
 					} else if (element === 'links') {
 						return (
-							<div className={`col-span-1 row-span-1 ${randomColor.bg} p-2 md:p-5 text-white flex flex-col gap-3 text-normal md:text-xl h-[100%]`} key={element}>
+							<div
+								className={`col-span-1 row-span-1 ${randomColor.bg} p-2 md:p-5 text-white flex flex-col gap-3 text-normal md:text-xl h-[100%]`}
+								key={element}>
 								<Link href="https://ericfzhu.com" target="_blank" className="hover:text-black duration-300">
 									Home
 								</Link>
@@ -144,51 +148,11 @@ export default function IndexPage({ quote, neighbors }: { quote: Metadata; neigh
 								<span className="text-sm mt-auto">Click on a tile to see neighbors</span>
 							</div>
 						);
-					} else {
-						<GridItem id={-1} isLink={true} key={element} color={randomColor}/>;
+					} else if (element === 'cloud') {
+						return <GridItem id={-1} isLink={true} key={element} color={randomColor} />;
 					}
 				})}
 			</div>
-
-			{/* 
-			<div
-				className={`grid grid-cols-3 md:grid-cols-4 grid-rows-2 md:grid-rows-3 max-h-screen h-full overflow-hidden ${jetBrainsMono.className}`}>
-				<div className="flex flex-col p-5 bg-accent text-white">
-					<p className={`text-left whitespace-pre-line flex-grow overflow-auto`}>{quote.quote}</p>
-					<div className="flex w-full justify-end pt-2">
-						<div>
-							{quote.author && <p>{quote.author}</p>}
-							{quote.book_title && <i>{quote.book_title}</i>}
-						</div>
-					</div>
-				</div>
-				{neighbors
-					.filter((neighbor: { metadata: Metadata; score: number }) => neighbor.metadata.quote !== quote.quote)
-					.map((neighbor: { metadata: Metadata; score: number; id: number }, index: number) => {
-						neighbor.metadata.score = neighbor.score;
-						return (
-							<GridItem
-								id={neighbor.id}
-								metadata={neighbor.metadata}
-								key={index}
-							/>
-						);
-					})}
-				<GridItem id={-1} isLink={true} />
-
-				<div className="col-span-1 row-span-1 bg-accent p-5 text-white flex flex-col gap-3 text-xl">
-					<Link href="https://ericfzhu.com" target='_blank' className="hover:text-black duration-300">
-						Home
-					</Link>
-					<Link href="https://github.com/ericfzhu/codex" target='_blank' className="hover:text-black duration-300">
-						Github
-					</Link>
-					<Link href={'https://ericfzhu.com/?windows=works&fs=works'} target='_blank' className="hover:text-black duration-300">
-						Works
-					</Link>
-					<span className='text-sm mt-auto'>Click on a tile to see neighbors</span>
-				</div>
-			</div> */}
 		</main>
 	);
 }
