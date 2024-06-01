@@ -6,6 +6,7 @@ import { Metadata } from '@/types';
 import { JetBrains_Mono } from 'next/font/google';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
+import { IconArrowRight } from '@tabler/icons-react';
 
 const jetBrainsMono = JetBrains_Mono({
 	subsets: ['latin'],
@@ -129,7 +130,7 @@ export default function IndexPage({ quote, neighbors }: { quote: Metadata; neigh
 					} else if (element === 'links') {
 						return (
 							<div
-								className={`col-span-1 row-span-1 ${randomColor.bg} p-2 md:p-5 text-white flex flex-col gap-3 text-normal md:text-xl h-[100%]`}
+								className={`col-span-1 row-span-1 ${randomColor.bg} p-2 md:p-5 text-white flex flex-col gap-3 text-normal md:text-lg h-[100%] uppercase`}
 								key={element}>
 								<Link href="https://ericfzhu.com" target="_blank" className="hover:text-black duration-300">
 									Home
@@ -140,16 +141,17 @@ export default function IndexPage({ quote, neighbors }: { quote: Metadata; neigh
 								<Link
 									href={'https://github.com/ericfzhu/codex/blob/c6c72ad3bb928605dca87870438bcf233cbc1ec5/public/embeddings.parquet'}
 									target="_blank"
-									className="hover:text-black duration-300">
-									Embeddings
+									className="hover:text-black duration-300 flex gap-1">
+									Download Embeddings
+									{/* <IconArrowRight /> */}
 								</Link>
 								<Link href={'https://ericfzhu.com/projects'} target="_blank" className="hover:text-black duration-300">
-									Projects
+									Other Projects
 								</Link>
 								<button
-									className="w-full text-left hover:text-black duration-300"
+									className="w-full text-left hover:text-black duration-300 uppercase"
 									onClick={() => setElementsOrder(shuffleArray([...elementsOrder]))}>
-									Shuffle
+									Shuffle Positions
 								</button>
 								<span className="text-sm mt-auto">Click on a tile to see neighbors</span>
 							</div>
