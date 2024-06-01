@@ -138,7 +138,7 @@ export default function IndexPage({ quote, neighbors }: { quote: Metadata; neigh
 									Github
 								</Link>
 								<Link
-									href={'https://github.com/ericfzhu/codex/blob/5660c5c7c42b434fa7f3b0aa89cdc4db35eb814f/public/embeddings.parquet'}
+									href={'https://github.com/ericfzhu/codex/blob/c6c72ad3bb928605dca87870438bcf233cbc1ec5/public/embeddings.parquet'}
 									target="_blank"
 									className="hover:text-black duration-300">
 									Embeddings
