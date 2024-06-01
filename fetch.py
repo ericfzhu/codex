@@ -53,7 +53,6 @@ with open(output_csv_file, 'w', newline='', encoding='utf-8') as file:
         writer.writerow([quote, author])
 
 
-
 def scrape_quotes(page):
     url = f"https://www.goodreads.com/quotes?page={page}"
     response = requests.get(url)

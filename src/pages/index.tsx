@@ -137,8 +137,14 @@ export default function IndexPage({ quote, neighbors }: { quote: Metadata; neigh
 								<Link href="https://github.com/ericfzhu/codex" target="_blank" className="hover:text-black duration-300">
 									Github
 								</Link>
-								<Link href={'https://ericfzhu.com/?windows=works&fs=works'} target="_blank" className="hover:text-black duration-300">
-									Works
+								<Link
+									href={'https://github.com/ericfzhu/codex/blob/5660c5c7c42b434fa7f3b0aa89cdc4db35eb814f/public/embeddings.parquet'}
+									target="_blank"
+									className="hover:text-black duration-300">
+									Embeddings
+								</Link>
+								<Link href={'https://ericfzhu.com/projects'} target="_blank" className="hover:text-black duration-300">
+									Projects
 								</Link>
 								<button
 									className="w-full text-left hover:text-black duration-300"
