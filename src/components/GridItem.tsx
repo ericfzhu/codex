@@ -25,7 +25,7 @@ export default function GridItem({ id, metadata, isLink = false, color }: GridIt
 			onMouseLeave={() => setIsHovered(false)}>
 			{isLink && (
 				<Link href="/cloud" className="flex h-full w-full p-2 md:p-5 justify-between flex-col">
-					<p>Explore memetic cloud</p>
+					<p>Memetic cloud</p>
 					<div className="w-full h-full relative">
 						<Image
 							src="/cloud.png"

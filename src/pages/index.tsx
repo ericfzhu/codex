@@ -6,7 +6,8 @@ import { Metadata } from '@/types';
 import { JetBrains_Mono } from 'next/font/google';
 import { GetServerSideProps } from 'next';
 import Link from 'next/link';
-import { IconArrowRight } from '@tabler/icons-react';
+
+import { cachedResults } from '@/lib/cachedResults';
 
 const jetBrainsMono = JetBrains_Mono({
 	subsets: ['latin'],
@@ -15,46 +16,77 @@ const jetBrainsMono = JetBrains_Mono({
 export const runtime = 'experimental-edge';
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
-	const pinecone = new Pinecone({
-		apiKey: process.env.PINECONE_API_KEY!,
-	});
-	const index = pinecone.index('codex');
-	const id = context.query.id ? context.query.id.toString() : Math.floor(Math.random() * 4900).toString();
-	const queryResponse = await index.query({
-		id: id,
-		topK: 1,
-		includeMetadata: true,
-		includeValues: true,
-	});
+	const id = context.query.id ? parseInt(context.query.id as string) : null;
 
-	const response = queryResponse.matches[0];
-	const vectorData = response.values;
-	const secondQueryResponse = await index.query({
-		vector: vectorData,
-		topK: 15,
-		includeMetadata: true,
-	});
-	let secondResponse = secondQueryResponse.matches;
-	const metadata = response.metadata;
+	if (id !== null) {
+		const pinecone = new Pinecone({
+			apiKey: process.env.PINECONE_API_KEY!,
+		});
+		const index = pinecone.index('codex');
+		const queryResponse = await index.query({
+			id: id.toString(),
+			topK: 1,
+			includeMetadata: true,
+			includeValues: true,
+		});
 
-	const uniqueQuotes = new Set();
-	secondResponse = secondResponse
-		.filter((match) => {
-			if (match.metadata!.quote !== metadata!.quote && !uniqueQuotes.has(match.metadata!.quote)) {
-				uniqueQuotes.add(match.metadata!.quote);
-				return true;
-			}
-			return false;
-		})
-		.slice(0, 9);
+		const response = queryResponse.matches[0];
+		const vectorData = response.values;
+		const secondQueryResponse = await index.query({
+			vector: vectorData,
+			topK: 15,
+			includeMetadata: true,
+		});
+		let secondResponse = secondQueryResponse.matches;
+		const metadata = response.metadata;
 
+		const uniqueQuotes = new Set();
+		secondResponse = secondResponse
+			.filter((match) => {
+				if (match.metadata!.quote !== metadata!.quote && !uniqueQuotes.has(match.metadata!.quote)) {
+					uniqueQuotes.add(match.metadata!.quote);
+					return true;
+				}
+				return false;
+			})
+			.slice(0, 9);
+
+		return {
+			props: {
+				quote: metadata,
+				neighbors: secondResponse.map((match) => ({ metadata: match.metadata, score: match.score, id: match.id })),
+				isServerSideProps: true,
+			},
+		};
+	}
+
+	const randomIndex = Math.floor(Math.random() * cachedResults.length);
 	return {
 		props: {
-			quote: metadata,
-			neighbors: secondResponse.map((match) => ({ metadata: match.metadata, score: match.score, id: match.id })),
+			quote: cachedResults[randomIndex],
+			neighbors: cachedResults[randomIndex].neighbors,
+			isServerSideProps: false,
 		},
 	};
 };
+
+interface QuoteData {
+	author: string;
+	book_title: string;
+	quote: string;
+}
+
+interface Neighbor {
+	metadata: QuoteData;
+	score: number;
+	id: number;
+}
+
+interface IndexPageProps {
+	quote: QuoteData;
+	neighbors: Neighbor[];
+	isServerSideProps: boolean;
+}
 
 function shuffleArray(array: string[]) {
 	for (let i = array.length - 1; i > 0; i--) {
@@ -64,32 +96,36 @@ function shuffleArray(array: string[]) {
 	return array;
 }
 
-export default function IndexPage({ quote, neighbors }: { quote: Metadata; neighbors: { metadata: Metadata; score: number; id: number }[] }) {
-	const initialElements = ['quote', ...neighbors.map((n, index) => `neighbor-${index}`), 'cloud', 'links'];
+export default function IndexPage({ quote, neighbors, isServerSideProps }: IndexPageProps) {
+	// const [currentIndex, setCurrentIndex] = useState(0);
+	const [elementsOrder, setElementsOrder] = useState<string[]>([]);
+
 	const colors = [
-		{
-			bg: 'bg-[#7070FF]',
-			hoverbg: 'hover:bg-[#7070FF]',
-			border: 'border-[#C5C5FF]',
-		},
-		{
-			bg: 'bg-[#8BDB50]',
-			hoverbg: 'hover:bg-[#8BDB50]',
-			border: 'border-[#E1FBBB]',
-		},
-		{
-			bg: 'bg-[#EE6A20]',
-			hoverbg: 'hover:bg-[#EE6A20]',
-			border: 'border-[#FDD5A5]',
-		},
-		{
-			bg: 'bg-[#70A3F2]',
-			hoverbg: 'hover:bg-[#70A3F2]',
-			border: 'border-[#ADC8FF]',
-		},
+		{ bg: 'bg-[#7070FF]', hoverbg: 'hover:bg-[#7070FF]', border: 'border-[#C5C5FF]' },
+		{ bg: 'bg-[#8BDB50]', hoverbg: 'hover:bg-[#8BDB50]', border: 'border-[#E1FBBB]' },
+		{ bg: 'bg-[#EE6A20]', hoverbg: 'hover:bg-[#EE6A20]', border: 'border-[#FDD5A5]' },
+		{ bg: 'bg-[#70A3F2]', hoverbg: 'hover:bg-[#70A3F2]', border: 'border-[#ADC8FF]' },
 	];
 	const randomColor = colors[Math.floor(Math.random() * colors.length)];
-	const [elementsOrder, setElementsOrder] = useState(initialElements);
+
+	useEffect(() => {
+		setElementsOrder(['quote', ...neighbors.map((_, index) => `neighbor-${index}`), 'cloud', 'links']);
+	}, [neighbors]);
+
+	function shuffleArray(array: string[]) {
+		const newArray = [...array];
+		for (let i = newArray.length - 1; i > 0; i--) {
+			const j = Math.floor(Math.random() * (i + 1));
+			[newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+		}
+		return newArray;
+	}
+
+	const loadRandomQuote = () => {
+		if (!isServerSideProps) {
+			window.location.href = window.location.pathname; // Reload the page to get a new random quote
+		}
+	};
 
 	return (
 		<main className="bg-white h-screen overflow-hidden">
@@ -125,7 +161,6 @@ export default function IndexPage({ quote, neighbors }: { quote: Metadata; neigh
 					} else if (element.startsWith('neighbor-')) {
 						const index = parseInt(element.split('-')[1]);
 						const neighbor = neighbors[index];
-						neighbor.metadata.score = neighbor.score;
 						return <GridItem id={neighbor.id} metadata={neighbor.metadata} key={element} color={randomColor} />;
 					} else if (element === 'links') {
 						return (
@@ -138,20 +173,19 @@ export default function IndexPage({ quote, neighbors }: { quote: Metadata; neigh
 								<Link href="https://github.com/ericfzhu/codex" target="_blank" className="hover:text-black duration-300">
 									Github
 								</Link>
-								<Link
+								{/* <Link
 									href={'https://github.com/ericfzhu/codex/blob/c6c72ad3bb928605dca87870438bcf233cbc1ec5/public/embeddings.parquet'}
 									target="_blank"
 									className="hover:text-black duration-300 flex gap-1">
 									Download Embeddings
-									{/* <IconArrowRight /> */}
-								</Link>
+								</Link> */}
 								<Link href={'https://ericfzhu.com/projects'} target="_blank" className="hover:text-black duration-300">
 									Other Projects
 								</Link>
 								<button
 									className="w-full text-left hover:text-black duration-300 uppercase"
 									onClick={() => setElementsOrder(shuffleArray([...elementsOrder]))}>
-									Shuffle Positions
+									Shuffle
 								</button>
 								<span className="text-sm mt-auto">Click on a tile to see neighbors</span>
 							</div>
