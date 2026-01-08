@@ -1,12 +1,19 @@
+import { useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { JetBrains_Mono } from 'next/font/google';
+import { preloadIndices } from '@/lib/searchClient';
 
 const jetBrainsMono = JetBrains_Mono({
 	subsets: ['latin'],
 });
 
 export default function HomePage() {
+	// Preload search indices in background
+	useEffect(() => {
+		preloadIndices();
+	}, []);
+
 	return (
 		<main className={`min-h-screen bg-accent flex items-center justify-center ${jetBrainsMono.className}`}>
 			<Head>

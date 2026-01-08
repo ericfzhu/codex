@@ -1,7 +1,56 @@
 /**
  * Client-side vector search using brute-force dot product.
  * Supports multiple collections (quotes, bible).
+ * Uses IndexedDB for caching to speed up subsequent loads.
  */
+
+// IndexedDB cache helpers
+const DB_NAME = 'codex-embeddings';
+const DB_VERSION = 1;
+
+function openDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains('cache')) {
+        db.createObjectStore('cache');
+      }
+    };
+  });
+}
+
+async function getCached<T>(key: string): Promise<T | null> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('cache', 'readonly');
+      const store = tx.objectStore('cache');
+      const request = store.get(key);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result ?? null);
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function setCache<T>(key: string, value: T): Promise<void> {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('cache', 'readwrite');
+      const store = tx.objectStore('cache');
+      const request = store.put(value, key);
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve();
+    });
+  } catch {
+    // Silently fail cache writes
+  }
+}
 
 export interface QuoteMetadata {
   id: number;
@@ -58,6 +107,21 @@ export async function loadSearchIndex<T>(
   }
 
   const loadPromise = (async () => {
+    // Try IndexedDB cache first
+    const cachedIndex = await getCached<{ metadata: T[]; embeddings: ArrayBuffer }>(cacheKey);
+    if (cachedIndex) {
+      const embeddings = new Int8Array(cachedIndex.embeddings);
+      const index: SearchIndex<T> = {
+        metadata: cachedIndex.metadata,
+        embeddings,
+        numItems: cachedIndex.metadata.length,
+        embeddingDim,
+      };
+      indexCache.set(cacheKey, index);
+      return index;
+    }
+
+    // Fetch from network
     const embeddingsUrls = Array.isArray(embeddingsUrl) ? embeddingsUrl : [embeddingsUrl];
 
     const [metadataRes, ...embeddingsResponses] = await Promise.all([
@@ -93,6 +157,9 @@ export async function loadSearchIndex<T>(
       );
     }
 
+    // Cache in IndexedDB for next time
+    setCache(cacheKey, { metadata, embeddings: embeddings.buffer });
+
     const index: SearchIndex<T> = { metadata, embeddings, numItems, embeddingDim };
     indexCache.set(cacheKey, index);
     return index;
@@ -107,6 +174,18 @@ export async function loadSearchIndex<T>(
  */
 export async function loadQuotesIndex(): Promise<SearchIndex<QuoteMetadata>> {
   return loadSearchIndex<QuoteMetadata>('/quotes-cohere.json', '/quotes-embeddings-int8.bin', 1024);
+}
+
+/**
+ * Preload indices in background (call from homepage).
+ */
+export function preloadIndices(): void {
+  // Start loading in background, don't await
+  loadQuotesIndex().catch(() => {});
+  // Bible is larger, only preload if user has fast connection
+  if (typeof navigator !== 'undefined' && (navigator as any).connection?.effectiveType === '4g') {
+    loadBibleIndex().catch(() => {});
+  }
 }
 
 /**
