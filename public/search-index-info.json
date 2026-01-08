@@ -1,0 +1,7 @@
+{
+  "numQuotes": 4938,
+  "embeddingDim": 1536,
+  "embeddingsFile": "embeddings.bin",
+  "metadataFile": "quotes.json",
+  "createdAt": "2026-01-08T12:04:02.809Z"
+}
