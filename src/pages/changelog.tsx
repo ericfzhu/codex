@@ -36,7 +36,7 @@ const changelog: ChangelogEntry[] = [
 			},
 			{
 				title: 'Christianity page',
-				description: 'Same matrix interface for exploring Bible verses across KJV, Deuterocanon, and Apostolic Fathers translations.',
+				description: 'Same matrix interface for exploring Bible verses across King James Bible, Deuterocanonical, and Apocrypha sources.',
 			},
 			{
 				title: 'Idea lineage view',
@@ -52,6 +52,10 @@ const changelog: ChangelogEntry[] = [
 			{
 				title: 'Responsive design',
 				description: 'Text and padding scale with viewport size. Grid adapts between 3x4 and 4x3 layouts.',
+			},
+			{
+				title: 'Performance optimizations',
+				description: 'Embeddings cached in IndexedDB for instant subsequent loads. Preloading starts on homepage. Int8 quantization reduces download size by 75%.',
 			},
 		],
 	},

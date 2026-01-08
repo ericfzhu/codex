@@ -35,6 +35,16 @@ function formatReference(verse: VerseMetadata | Neighbor): string {
 	return `${verse.book} ${verse.chapter}:${verse.verse}`;
 }
 
+const sourceNames: Record<string, string> = {
+	KJV: 'KING JAMES BIBLE',
+	DEUT: 'DEUTEROCANONICAL',
+	APODAT: 'APOCRYPHA',
+};
+
+function formatSource(source: string): string {
+	return sourceNames[source] || source;
+}
+
 export default function ChristianityPage() {
 	const router = useRouter();
 	const [searchIndex, setSearchIndex] = useState<SearchIndex<VerseMetadata> | null>(null);
@@ -185,7 +195,7 @@ export default function ChristianityPage() {
 					{/* Main verse - fixed height */}
 					<div className="h-28 shrink-0 p-3 border-b border-gray-200 dark:border-gray-700 bg-amber-600 text-white flex flex-col">
 						<div className="shrink-0 flex items-center gap-2 mb-1">
-							<span className="text-xs px-2 py-0.5 border border-white/30">{currentVerse.source}</span>
+							<span className="text-xs px-2 py-0.5 border border-white/30">{formatSource(currentVerse.source)}</span>
 						</div>
 						<div className="flex-1 overflow-y-auto min-h-0 mb-1">
 							<p className="text-sm leading-relaxed">{currentVerse.text}</p>
@@ -205,7 +215,7 @@ export default function ChristianityPage() {
 								<div className="h-full flex flex-col min-h-0">
 									<div className="shrink-0 flex items-center gap-2 mb-1">
 										<span className="text-[10px] sm:text-xs px-1 py-0.5 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 group-hover:border-white/30 group-hover:text-white">
-											{neighbor.source}
+											{formatSource(neighbor.source)}
 										</span>
 									</div>
 									<div className="flex-1 overflow-y-auto min-h-0 mb-1">
