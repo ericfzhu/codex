@@ -18,12 +18,13 @@ interface CompareQuote {
 	book_title: string;
 }
 
-function dotProduct(a: Float32Array, b: Float32Array): number {
+function dotProduct(a: Int8Array, b: Int8Array): number {
 	let sum = 0;
 	for (let i = 0; i < a.length; i++) {
 		sum += a[i] * b[i];
 	}
-	return sum;
+	// Scale back: each value was multiplied by 127, so divide by 127^2
+	return sum / (127 * 127);
 }
 
 function SimilarityMatrix({ quotes, searchIndex }: { quotes: CompareQuote[]; searchIndex: SearchIndex<QuoteMetadata> | null }) {
