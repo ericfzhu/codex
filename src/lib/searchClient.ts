@@ -40,10 +40,11 @@ const loadPromises: Map<string, Promise<SearchIndex<any>>> = new Map();
 
 /**
  * Load a search index (metadata + embeddings).
+ * Supports single file or chunked embeddings.
  */
 export async function loadSearchIndex<T>(
   metadataUrl: string,
-  embeddingsUrl: string,
+  embeddingsUrl: string | string[],
   embeddingDim: number = 1024
 ): Promise<SearchIndex<T>> {
   const cacheKey = metadataUrl;
@@ -57,18 +58,32 @@ export async function loadSearchIndex<T>(
   }
 
   const loadPromise = (async () => {
-    const [metadataRes, embeddingsRes] = await Promise.all([
+    const embeddingsUrls = Array.isArray(embeddingsUrl) ? embeddingsUrl : [embeddingsUrl];
+
+    const [metadataRes, ...embeddingsResponses] = await Promise.all([
       fetch(metadataUrl),
-      fetch(embeddingsUrl),
+      ...embeddingsUrls.map(url => fetch(url)),
     ]);
 
-    if (!metadataRes.ok || !embeddingsRes.ok) {
+    if (!metadataRes.ok || embeddingsResponses.some(r => !r.ok)) {
       throw new Error('Failed to load search index');
     }
 
     const metadata: T[] = await metadataRes.json();
-    const embeddingsBuffer = await embeddingsRes.arrayBuffer();
-    const embeddings = new Int8Array(embeddingsBuffer);
+
+    // Load and concatenate embedding chunks
+    const embeddingsBuffers = await Promise.all(
+      embeddingsResponses.map(r => r.arrayBuffer())
+    );
+
+    const totalLength = embeddingsBuffers.reduce((sum, buf) => sum + buf.byteLength, 0);
+    const embeddings = new Int8Array(totalLength);
+
+    let offset = 0;
+    for (const buffer of embeddingsBuffers) {
+      embeddings.set(new Int8Array(buffer), offset);
+      offset += buffer.byteLength;
+    }
 
     const numItems = metadata.length;
 
@@ -95,10 +110,18 @@ export async function loadQuotesIndex(): Promise<SearchIndex<QuoteMetadata>> {
 }
 
 /**
- * Load Bible search index.
+ * Load Bible search index (chunked for Cloudflare Pages 25MB limit).
  */
 export async function loadBibleIndex(): Promise<SearchIndex<VerseMetadata>> {
-  return loadSearchIndex<VerseMetadata>('/bible-cohere.json', '/bible-embeddings-int8.bin', 1024);
+  return loadSearchIndex<VerseMetadata>(
+    '/bible-cohere.json',
+    [
+      '/bible-embeddings-int8-0.bin',
+      '/bible-embeddings-int8-1.bin',
+      '/bible-embeddings-int8-2.bin',
+    ],
+    1024
+  );
 }
 
 /**

@@ -1,0 +1,8 @@
+{
+  "chunks": [
+    "bible-embeddings-int8-0.bin",
+    "bible-embeddings-int8-1.bin",
+    "bible-embeddings-int8-2.bin"
+  ],
+  "totalChunks": 3
+}
