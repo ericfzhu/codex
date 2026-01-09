@@ -30,6 +30,15 @@ export default function HomePage() {
 				<Link href="/christianity" className="hover:opacity-70 transition-opacity">
 					Christianity
 				</Link>
+				<Link href="/islam" className="hover:opacity-70 transition-opacity">
+					Islam
+				</Link>
+				<Link href="/mormonism" className="hover:opacity-70 transition-opacity">
+					Mormonism
+				</Link>
+				<Link href="/confucianism" className="hover:opacity-70 transition-opacity">
+					Confucianism
+				</Link>
 				<Link href="/cloud" className="hover:opacity-70 transition-opacity">
 					Memetic Cloud
 				</Link>

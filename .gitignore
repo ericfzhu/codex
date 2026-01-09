@@ -2,6 +2,16 @@
 # **/*.csv
 quotes.csv
 
+# Source data directories
+confucian/
+islam/
+mormonism/
+christianity/
+
+# Non-quantized embeddings (too large)
+public/*-embeddings.bin
+!public/*-embeddings-int8*.bin
+
 
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 

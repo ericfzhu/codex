@@ -302,6 +302,279 @@ async function processBible(): Promise<void> {
   console.log(`Saved embeddings to ${embeddingsPath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
 }
 
+async function processIslam(): Promise<void> {
+  console.log('\n=== Processing Islam Texts ===\n');
+
+  const islamDir = path.join(__dirname, '..', 'islam');
+  const allItems: EmbeddedItem[] = [];
+  let globalId = 0;
+
+  // Process Quran
+  const quranPath = path.join(islamDir, 'quran_verses.csv');
+  const quranContent = fs.readFileSync(quranPath, 'utf-8');
+  const quranParsed = Papa.parse(quranContent, { header: true, skipEmptyLines: true });
+
+  for (const row of quranParsed.data as any[]) {
+    if (row.Text && row.Text.trim().length > 0) {
+      allItems.push({
+        id: globalId++,
+        text: row.Text,
+        metadata: {
+          book: row.Sura || '',
+          chapter: row.Section || '',
+          verse: row.Paragraph || '',
+          source: 'QURAN',
+        },
+      });
+    }
+  }
+  console.log(`Loaded ${quranParsed.data.length} Quran verses`);
+
+  // Process Hadith
+  const hadithPath = path.join(islamDir, 'hadith.csv');
+  const hadithContent = fs.readFileSync(hadithPath, 'utf-8');
+  const hadithParsed = Papa.parse(hadithContent, { header: true, skipEmptyLines: true });
+
+  for (const row of hadithParsed.data as any[]) {
+    if (row.Text && row.Text.trim().length > 0) {
+      allItems.push({
+        id: globalId++,
+        text: row.Text,
+        metadata: {
+          book: row.Book || '',
+          chapter: `Vol. ${row.Volume || ''}`,
+          verse: row.Number || '',
+          source: 'HADITH',
+          narrator: row.Narrator || '',
+        },
+      });
+    }
+  }
+  console.log(`Loaded ${hadithParsed.data.length} Hadith`);
+  console.log(`Total: ${allItems.length} items`);
+
+  // Embed and save
+  const embeddingsPath = path.join(__dirname, '..', 'public', 'islam-embeddings.bin');
+  const metadataPath = path.join(__dirname, '..', 'public', 'islam-cohere.json');
+
+  fs.writeFileSync(embeddingsPath, Buffer.alloc(0));
+
+  const total = allItems.length;
+  const batches = Math.ceil(total / BATCH_SIZE);
+  const metadata: any[] = [];
+
+  console.log(`Embedding ${total} items in ${batches} batches...`);
+
+  for (let i = 0; i < batches; i++) {
+    const start = i * BATCH_SIZE;
+    const end = Math.min(start + BATCH_SIZE, total);
+    const batch = allItems.slice(start, end);
+    const texts = batch.map(item => item.text);
+
+    try {
+      const embeddings = await embedBatch(texts);
+
+      for (let j = 0; j < batch.length; j++) {
+        const embeddingBuffer = new Float32Array(embeddings[j]);
+        fs.appendFileSync(embeddingsPath, Buffer.from(embeddingBuffer.buffer));
+
+        metadata.push({
+          id: batch[j].id,
+          text: batch[j].text,
+          book: batch[j].metadata.book,
+          chapter: batch[j].metadata.chapter,
+          verse: batch[j].metadata.verse,
+          source: batch[j].metadata.source,
+          narrator: batch[j].metadata.narrator || undefined,
+        });
+      }
+
+      const progress = ((i + 1) / batches * 100).toFixed(1);
+      console.log(`  Batch ${i + 1}/${batches} (${progress}%) - ${end}/${total} items`);
+
+      if (i < batches - 1) await sleep(DELAY_BETWEEN_BATCHES);
+    } catch (error: any) {
+      console.error(`Error in batch ${i + 1}:`, error.message);
+      await sleep(5000);
+      i--;
+    }
+  }
+
+  fs.writeFileSync(metadataPath, JSON.stringify(metadata));
+  console.log(`Saved metadata to ${metadataPath}`);
+
+  const stats = fs.statSync(embeddingsPath);
+  console.log(`Saved embeddings to ${embeddingsPath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
+}
+
+async function processMormon(): Promise<void> {
+  console.log('\n=== Processing Book of Mormon ===\n');
+
+  const mormonPath = path.join(__dirname, '..', 'mormonism', 'mormon_verses.csv');
+  const csvContent = fs.readFileSync(mormonPath, 'utf-8');
+  const parsed = Papa.parse(csvContent, { header: true, skipEmptyLines: true });
+
+  const allItems: EmbeddedItem[] = [];
+  let globalId = 0;
+
+  for (const row of parsed.data as any[]) {
+    if (row.Text && row.Text.trim().length > 0) {
+      allItems.push({
+        id: globalId++,
+        text: row.Text,
+        metadata: {
+          book: row.Book || '',
+          chapter: row.Chapter || '',
+          verse: row.Verse || '',
+          source: 'BOOK OF MORMON',
+        },
+      });
+    }
+  }
+
+  console.log(`Loaded ${allItems.length} verses`);
+
+  const embeddingsPath = path.join(__dirname, '..', 'public', 'mormon-embeddings.bin');
+  const metadataPath = path.join(__dirname, '..', 'public', 'mormon-cohere.json');
+
+  fs.writeFileSync(embeddingsPath, Buffer.alloc(0));
+
+  const total = allItems.length;
+  const batches = Math.ceil(total / BATCH_SIZE);
+  const metadata: any[] = [];
+
+  console.log(`Embedding ${total} verses in ${batches} batches...`);
+
+  for (let i = 0; i < batches; i++) {
+    const start = i * BATCH_SIZE;
+    const end = Math.min(start + BATCH_SIZE, total);
+    const batch = allItems.slice(start, end);
+    const texts = batch.map(item => item.text);
+
+    try {
+      const embeddings = await embedBatch(texts);
+
+      for (let j = 0; j < batch.length; j++) {
+        const embeddingBuffer = new Float32Array(embeddings[j]);
+        fs.appendFileSync(embeddingsPath, Buffer.from(embeddingBuffer.buffer));
+
+        metadata.push({
+          id: batch[j].id,
+          text: batch[j].text,
+          book: batch[j].metadata.book,
+          chapter: batch[j].metadata.chapter,
+          verse: batch[j].metadata.verse,
+          source: batch[j].metadata.source,
+        });
+      }
+
+      const progress = ((i + 1) / batches * 100).toFixed(1);
+      console.log(`  Batch ${i + 1}/${batches} (${progress}%) - ${end}/${total} verses`);
+
+      if (i < batches - 1) await sleep(DELAY_BETWEEN_BATCHES);
+    } catch (error: any) {
+      console.error(`Error in batch ${i + 1}:`, error.message);
+      await sleep(5000);
+      i--;
+    }
+  }
+
+  fs.writeFileSync(metadataPath, JSON.stringify(metadata));
+  console.log(`Saved metadata to ${metadataPath}`);
+
+  const stats = fs.statSync(embeddingsPath);
+  console.log(`Saved embeddings to ${embeddingsPath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
+}
+
+async function processConfucian(): Promise<void> {
+  console.log('\n=== Processing Confucian Texts ===\n');
+
+  const confucianDir = path.join(__dirname, '..', 'confucian');
+  const allItems: EmbeddedItem[] = [];
+  let globalId = 0;
+
+  const files = [
+    { file: 'analects_verses.csv', source: 'ANALECTS' },
+    { file: 'confucianism_doctrine_of_the_mean_verses.csv', source: 'DOCTRINE OF THE MEAN' },
+    { file: 'confucianism_great_learning_verses.csv', source: 'GREAT LEARNING' },
+  ];
+
+  for (const { file, source } of files) {
+    const csvPath = path.join(confucianDir, file);
+    const csvContent = fs.readFileSync(csvPath, 'utf-8');
+    const parsed = Papa.parse(csvContent, { header: true, skipEmptyLines: true });
+
+    for (const row of parsed.data as any[]) {
+      if (row.Text && row.Text.trim().length > 0) {
+        allItems.push({
+          id: globalId++,
+          text: row.Text,
+          metadata: {
+            book: source,
+            chapter: row.Section || row.Part || '',
+            verse: row.Paragraph || '',
+            source,
+          },
+        });
+      }
+    }
+    console.log(`Loaded ${parsed.data.length} passages from ${source}`);
+  }
+
+  console.log(`Total: ${allItems.length} passages`);
+
+  const embeddingsPath = path.join(__dirname, '..', 'public', 'confucian-embeddings.bin');
+  const metadataPath = path.join(__dirname, '..', 'public', 'confucian-cohere.json');
+
+  fs.writeFileSync(embeddingsPath, Buffer.alloc(0));
+
+  const total = allItems.length;
+  const batches = Math.ceil(total / BATCH_SIZE);
+  const metadata: any[] = [];
+
+  console.log(`Embedding ${total} passages in ${batches} batches...`);
+
+  for (let i = 0; i < batches; i++) {
+    const start = i * BATCH_SIZE;
+    const end = Math.min(start + BATCH_SIZE, total);
+    const batch = allItems.slice(start, end);
+    const texts = batch.map(item => item.text);
+
+    try {
+      const embeddings = await embedBatch(texts);
+
+      for (let j = 0; j < batch.length; j++) {
+        const embeddingBuffer = new Float32Array(embeddings[j]);
+        fs.appendFileSync(embeddingsPath, Buffer.from(embeddingBuffer.buffer));
+
+        metadata.push({
+          id: batch[j].id,
+          text: batch[j].text,
+          book: batch[j].metadata.book,
+          chapter: batch[j].metadata.chapter,
+          verse: batch[j].metadata.verse,
+          source: batch[j].metadata.source,
+        });
+      }
+
+      const progress = ((i + 1) / batches * 100).toFixed(1);
+      console.log(`  Batch ${i + 1}/${batches} (${progress}%) - ${end}/${total} passages`);
+
+      if (i < batches - 1) await sleep(DELAY_BETWEEN_BATCHES);
+    } catch (error: any) {
+      console.error(`Error in batch ${i + 1}:`, error.message);
+      await sleep(5000);
+      i--;
+    }
+  }
+
+  fs.writeFileSync(metadataPath, JSON.stringify(metadata));
+  console.log(`Saved metadata to ${metadataPath}`);
+
+  const stats = fs.statSync(embeddingsPath);
+  console.log(`Saved embeddings to ${embeddingsPath} (${(stats.size / 1024 / 1024).toFixed(2)} MB)`);
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const target = args[0] || 'all';
@@ -315,6 +588,18 @@ async function main() {
 
   if (target === 'bible' || target === 'all') {
     await processBible();
+  }
+
+  if (target === 'islam' || target === 'all') {
+    await processIslam();
+  }
+
+  if (target === 'mormon' || target === 'all') {
+    await processMormon();
+  }
+
+  if (target === 'confucian' || target === 'all') {
+    await processConfucian();
   }
 
   console.log('\nDone!');

@@ -103,6 +103,9 @@ async function main() {
   const files = [
     { input: 'quotes-embeddings.bin', output: 'quotes-embeddings-int8.bin', dims: 1024 },
     { input: 'bible-embeddings.bin', output: 'bible-embeddings-int8.bin', dims: 1024 },
+    { input: 'islam-embeddings.bin', output: 'islam-embeddings-int8.bin', dims: 1024 },
+    { input: 'mormon-embeddings.bin', output: 'mormon-embeddings-int8.bin', dims: 1024 },
+    { input: 'confucian-embeddings.bin', output: 'confucian-embeddings-int8.bin', dims: 1024 },
   ];
 
   const stats: QuantizationStats[] = [];

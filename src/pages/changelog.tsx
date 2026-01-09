@@ -19,6 +19,36 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
 	{
+		version: '0.2.0',
+		date: '2025-01-09',
+		changes: [
+			{
+				title: 'Islam page',
+				description: 'Explore Quran and Hadith verses with the same matrix interface. Emerald color theme.',
+			},
+			{
+				title: 'Mormonism page',
+				description: 'Explore Book of Mormon verses. Blue color theme.',
+			},
+			{
+				title: 'Confucianism page',
+				description: 'Explore Analects, Doctrine of the Mean, and Great Learning. Red color theme.',
+			},
+			{
+				title: 'Memetic Cloud redesign',
+				description: 'Rebuilt as 2D visualization with WebGL rendering for 68K+ points. Filter by religion, author, or book. Click to select quotes and view details. Zoom with scroll wheel.',
+			},
+			{
+				title: 'WebGL performance',
+				description: 'Switched from Canvas 2D to WebGL with custom shaders. Renders 68,000 points smoothly with color-coded dots using golden angle distribution for full rainbow spectrum.',
+			},
+			{
+				title: 'UMAP projections',
+				description: 'All embeddings projected to 2D using UMAP dimensionality reduction for the cloud visualization.',
+			},
+		],
+	},
+	{
 		version: '0.1.0',
 		date: '2025-01-09',
 		changes: [
@@ -71,7 +101,10 @@ export default function ChangelogPage() {
 			<div className="max-w-2xl mx-auto px-4 py-12">
 				<div className="flex items-center justify-between mb-12">
 					<h1 className="text-2xl font-bold text-white uppercase">Changelog</h1>
-					<Link href="/" className="text-white/70 hover:text-white uppercase text-sm">
+					<Link href="/" className="text-white/70 hover:text-white uppercase text-sm flex items-center gap-1">
+						<svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+						</svg>
 						Back
 					</Link>
 				</div>

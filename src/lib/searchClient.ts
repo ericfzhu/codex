@@ -204,6 +204,27 @@ export async function loadBibleIndex(): Promise<SearchIndex<VerseMetadata>> {
 }
 
 /**
+ * Load Islam search index (Quran + Hadith).
+ */
+export async function loadIslamIndex(): Promise<SearchIndex<VerseMetadata>> {
+  return loadSearchIndex<VerseMetadata>('/islam-cohere.json', '/islam-embeddings-int8.bin', 1024);
+}
+
+/**
+ * Load Mormon search index (Book of Mormon).
+ */
+export async function loadMormonIndex(): Promise<SearchIndex<VerseMetadata>> {
+  return loadSearchIndex<VerseMetadata>('/mormon-cohere.json', '/mormon-embeddings-int8.bin', 1024);
+}
+
+/**
+ * Load Confucian search index (Analects, Doctrine of the Mean, Great Learning).
+ */
+export async function loadConfucianIndex(): Promise<SearchIndex<VerseMetadata>> {
+  return loadSearchIndex<VerseMetadata>('/confucian-cohere.json', '/confucian-embeddings-int8.bin', 1024);
+}
+
+/**
  * Get the embedding vector for an item by ID.
  */
 export function getEmbedding<T>(index: SearchIndex<T>, id: number): Int8Array {
