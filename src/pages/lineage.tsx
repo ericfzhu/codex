@@ -26,29 +26,19 @@ function LineageCard({ item, isSource = false }: { item: LineageItem; isSource?:
 	return (
 		<div
 			className={`p-4 rounded-lg border ${
-				isSource
-					? 'border-accent bg-accent/5 dark:bg-accent/10'
-					: 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+				isSource ? 'border-accent bg-accent/5 dark:bg-accent/10' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
 			}`}>
 			<div className="flex items-start justify-between gap-2 mb-2">
-				<span className={`text-xs px-2 py-0.5 rounded-full ${eraColors[item.era]}`}>
-					{item.year ? item.year : item.era}
-				</span>
-				{!isSource && (
-					<span className="text-xs text-gray-400 dark:text-gray-500">{(item.similarity * 100).toFixed(0)}% similar</span>
-				)}
+				<span className={`text-xs px-2 py-0.5 rounded-full ${eraColors[item.era]}`}>{item.year ? item.year : item.era}</span>
+				{!isSource && <span className="text-xs text-gray-400 dark:text-gray-500">{(item.similarity * 100).toFixed(0)}% similar</span>}
 			</div>
 			<p className="text-sm text-gray-900 dark:text-gray-100 mb-3 line-clamp-4">{item.quote}</p>
 			<div className="flex items-center justify-between">
 				<div>
 					<p className="font-medium text-gray-900 dark:text-white text-sm">{item.author || 'Unknown'}</p>
-					{item.book_title && (
-						<p className="text-xs text-gray-500 dark:text-gray-400 italic">{item.book_title}</p>
-					)}
+					{item.book_title && <p className="text-xs text-gray-500 dark:text-gray-400 italic">{item.book_title}</p>}
 				</div>
-				<Link
-					href={`/quotes?id=${item.id}`}
-					className="text-xs text-accent hover:underline">
+				<Link href={`/quotes?id=${item.id}`} className="text-xs text-accent hover:underline">
 					Explore &rarr;
 				</Link>
 			</div>
@@ -131,7 +121,7 @@ export default function LineagePage() {
 	return (
 		<main className={`min-h-screen bg-gray-50 dark:bg-gray-900 ${jetBrainsMono.className}`}>
 			<Head>
-				<title>Codex - Idea Lineage</title>
+				<title>Codex - Lineage</title>
 			</Head>
 
 			{/* Header */}
@@ -143,7 +133,7 @@ export default function LineagePage() {
 								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
 							</svg>
 						</button>
-						<h1 className="text-xl font-bold text-gray-900 dark:text-white uppercase">Idea Lineage</h1>
+						<h1 className="text-xl font-bold text-gray-900 dark:text-white uppercase">Lineage</h1>
 					</div>
 					<ThemeToggle />
 				</div>
@@ -171,9 +161,7 @@ export default function LineagePage() {
 					</div>
 				) : (
 					<>
-						<p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
-							Tracing how this idea appears across {result.lineage.length} different authors throughout history.
-						</p>
+						<p className="text-sm text-gray-500 dark:text-gray-400 mb-8">Tracing how this idea appears throughout history.</p>
 						<TimelineView result={result} />
 					</>
 				)}
