@@ -12,6 +12,7 @@ import {
 	QuoteMetadata,
 } from '@/lib/searchClient';
 import { isValidItemId, parseItemId } from '@/lib/routeIds';
+import LoadingProgress from '@/components/LoadingProgress';
 
 const jetBrainsMono = JetBrains_Mono({
 	subsets: ['latin'],
@@ -38,18 +39,37 @@ export default function QuotesPage() {
 	const [neighbors, setNeighbors] = useState<Neighbor[]>([]);
 	const [history, setHistory] = useState<HistoryItem[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
+	const [loadingProgress, setLoadingProgress] = useState(6);
 
 	// Load search index
 	useEffect(() => {
+		let cancelled = false;
+		let revealTimer: ReturnType<typeof setTimeout> | undefined;
+		const progressTimer = setInterval(() => {
+			setLoadingProgress((progress) => Math.min(92, progress + Math.max(0.4, (92 - progress) * 0.055)));
+		}, 180);
+
 		loadQuotesIndex()
 			.then((index) => {
+				if (cancelled) return;
+				clearInterval(progressTimer);
 				setSearchIndex(index);
-				setIsLoading(false);
+				setLoadingProgress(100);
+				revealTimer = setTimeout(() => setIsLoading(false), 260);
 			})
 			.catch((err) => {
 				console.error('Failed to load search index:', err);
-				setIsLoading(false);
+				if (!cancelled) {
+					clearInterval(progressTimer);
+					setIsLoading(false);
+				}
 			});
+
+		return () => {
+			cancelled = true;
+			clearInterval(progressTimer);
+			if (revealTimer) clearTimeout(revealTimer);
+		};
 	}, []);
 
 	// Handle search when index is loaded and id changes
@@ -169,7 +189,7 @@ export default function QuotesPage() {
 			</header>
 
 			{isLoading ? (
-				<div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">Loading...</div>
+				<LoadingProgress label="Loading Quotes" progress={loadingProgress} />
 			) : !currentQuote ? (
 				<div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">No quote selected</div>
 			) : (

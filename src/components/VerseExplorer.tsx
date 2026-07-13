@@ -11,6 +11,7 @@ import {
 	type VerseMetadata,
 } from '@/lib/searchClient';
 import { isValidItemId, parseItemId } from '@/lib/routeIds';
+import LoadingProgress from '@/components/LoadingProgress';
 
 const jetBrainsMono = JetBrains_Mono({ subsets: ['latin'] });
 
@@ -48,29 +49,42 @@ export default function VerseExplorer({ config }: { config: VerseExplorerConfig 
 	const [neighbors, setNeighbors] = useState<Neighbor[]>([]);
 	const [history, setHistory] = useState<HistoryItem[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
+	const [loadingProgress, setLoadingProgress] = useState(6);
 	const [error, setError] = useState<string | null>(null);
 	const [loadAttempt, setLoadAttempt] = useState(0);
 	const formatSource = config.formatSource ?? ((source: string) => source);
 
 	useEffect(() => {
 		let cancelled = false;
+		let revealTimer: ReturnType<typeof setTimeout> | undefined;
 		setIsLoading(true);
+		setLoadingProgress(6);
 		setError(null);
+		const progressTimer = setInterval(() => {
+			setLoadingProgress((progress) => Math.min(92, progress + Math.max(0.4, (92 - progress) * 0.055)));
+		}, 180);
 
 		config.loadIndex()
 			.then((index) => {
-				if (!cancelled) setSearchIndex(index);
+				if (cancelled) return;
+				clearInterval(progressTimer);
+				setSearchIndex(index);
+				setLoadingProgress(100);
+				revealTimer = setTimeout(() => setIsLoading(false), 260);
 			})
 			.catch((loadError) => {
 				console.error(`Failed to load ${config.title} index:`, loadError);
-				if (!cancelled) setError(config.errorMessage);
-			})
-			.finally(() => {
-				if (!cancelled) setIsLoading(false);
+				if (!cancelled) {
+					clearInterval(progressTimer);
+					setError(config.errorMessage);
+					setIsLoading(false);
+				}
 			});
 
 		return () => {
 			cancelled = true;
+			clearInterval(progressTimer);
+			if (revealTimer) clearTimeout(revealTimer);
 		};
 	}, [config, loadAttempt]);
 
@@ -148,7 +162,7 @@ export default function VerseExplorer({ config }: { config: VerseExplorerConfig 
 			</header>
 
 			{isLoading ? (
-				<div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">Loading...</div>
+				<LoadingProgress label={`Loading ${config.title}`} progress={loadingProgress} barClassName={config.accent.background} />
 			) : error ? (
 				<div className="flex-1 flex flex-col items-center justify-center">
 					<p className="text-gray-500 dark:text-gray-400 mb-4">{error}</p>
