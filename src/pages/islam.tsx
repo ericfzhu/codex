@@ -11,6 +11,7 @@ import {
 	SearchIndex,
 	VerseMetadata,
 } from '@/lib/searchClient';
+import { isValidItemId, parseItemId } from '@/lib/routeIds';
 
 const jetBrainsMono = JetBrains_Mono({
 	subsets: ['latin'],
@@ -117,15 +118,15 @@ export default function IslamPage() {
 	useEffect(() => {
 		if (!router.isReady || !searchIndex) return;
 
-		const id = router.query.id ? parseInt(router.query.id as string) : null;
+		const id = parseItemId(router.query.id);
 
-		if (id !== null) {
+		if (isValidItemId(id, searchIndex.numItems)) {
 			searchForVerse(id);
 		} else {
 			const random = getRandomItem(searchIndex);
 			router.replace(`/islam?id=${random.id}`, undefined, { shallow: true });
 		}
-	}, [router.isReady, router.query.id, searchIndex, searchForVerse]);
+	}, [router, router.isReady, router.query.id, searchIndex, searchForVerse]);
 
 	const handleNeighborClick = (id: number) => {
 		router.push(`/islam?id=${id}`, undefined, { shallow: true });

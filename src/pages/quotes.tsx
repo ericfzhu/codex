@@ -11,6 +11,7 @@ import {
 	SearchIndex,
 	QuoteMetadata,
 } from '@/lib/searchClient';
+import { isValidItemId, parseItemId } from '@/lib/routeIds';
 
 const jetBrainsMono = JetBrains_Mono({
 	subsets: ['latin'],
@@ -98,15 +99,15 @@ export default function QuotesPage() {
 	useEffect(() => {
 		if (!router.isReady || !searchIndex) return;
 
-		const id = router.query.id ? parseInt(router.query.id as string) : null;
+		const id = parseItemId(router.query.id);
 
-		if (id !== null) {
+		if (isValidItemId(id, searchIndex.numItems)) {
 			searchForQuote(id);
 		} else {
 			const random = getRandomItem(searchIndex);
 			router.replace(`/quotes?id=${random.id}`, undefined, { shallow: true });
 		}
-	}, [router.isReady, router.query.id, searchIndex, searchForQuote]);
+	}, [router, router.isReady, router.query.id, searchIndex, searchForQuote]);
 
 	const handleNeighborClick = (id: number) => {
 		router.push(`/quotes?id=${id}`, undefined, { shallow: true });

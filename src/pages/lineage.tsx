@@ -6,6 +6,7 @@ import { JetBrains_Mono } from 'next/font/google';
 import { loadQuotesIndex, SearchIndex, QuoteMetadata } from '@/lib/searchClient';
 import { findLineage, LineageResult, LineageItem } from '@/lib/lineageSearch';
 import ThemeToggle from '@/components/ThemeToggle';
+import { isValidItemId, parseItemId } from '@/lib/routeIds';
 
 const jetBrainsMono = JetBrains_Mono({
 	subsets: ['latin'],
@@ -106,8 +107,8 @@ export default function LineagePage() {
 	useEffect(() => {
 		if (!router.isReady || !searchIndex) return;
 
-		const id = router.query.id ? parseInt(router.query.id as string) : null;
-		if (id === null) {
+		const id = parseItemId(router.query.id);
+		if (!isValidItemId(id, searchIndex.numItems)) {
 			setLoading(false);
 			return;
 		}

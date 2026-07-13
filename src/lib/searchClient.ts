@@ -84,8 +84,8 @@ export interface SearchIndex<T> {
 }
 
 // Cache for loaded indices
-const indexCache: Map<string, SearchIndex<any>> = new Map();
-const loadPromises: Map<string, Promise<SearchIndex<any>>> = new Map();
+const indexCache = new Map<string, SearchIndex<unknown>>();
+const loadPromises = new Map<string, Promise<SearchIndex<unknown>>>();
 
 /**
  * Load a search index (metadata + embeddings).
@@ -99,11 +99,11 @@ export async function loadSearchIndex<T>(
   const cacheKey = metadataUrl;
 
   if (indexCache.has(cacheKey)) {
-    return indexCache.get(cacheKey)!;
+    return indexCache.get(cacheKey)! as SearchIndex<T>;
   }
 
   if (loadPromises.has(cacheKey)) {
-    return loadPromises.get(cacheKey)!;
+    return loadPromises.get(cacheKey)! as Promise<SearchIndex<T>>;
   }
 
   const loadPromise = (async () => {
@@ -117,7 +117,7 @@ export async function loadSearchIndex<T>(
         numItems: cachedIndex.metadata.length,
         embeddingDim,
       };
-      indexCache.set(cacheKey, index);
+      indexCache.set(cacheKey, index as SearchIndex<unknown>);
       return index;
     }
 
@@ -158,15 +158,21 @@ export async function loadSearchIndex<T>(
     }
 
     // Cache in IndexedDB for next time
-    setCache(cacheKey, { metadata, embeddings: embeddings.buffer });
+    void setCache(cacheKey, { metadata, embeddings: embeddings.buffer });
 
     const index: SearchIndex<T> = { metadata, embeddings, numItems, embeddingDim };
-    indexCache.set(cacheKey, index);
+    indexCache.set(cacheKey, index as SearchIndex<unknown>);
     return index;
   })();
 
-  loadPromises.set(cacheKey, loadPromise);
-  return loadPromise;
+  loadPromises.set(cacheKey, loadPromise as Promise<SearchIndex<unknown>>);
+  try {
+    return await loadPromise;
+  } finally {
+    // A transient failure must not poison future attempts. Successful indices
+    // remain available in indexCache.
+    loadPromises.delete(cacheKey);
+  }
 }
 
 /**
@@ -245,6 +251,14 @@ function dotProduct(a: Int8Array, b: Int8Array): number {
   return sum / (127 * 127);
 }
 
+function dotProductAt(embeddings: Int8Array, offset: number, query: Int8Array): number {
+  let sum = 0;
+  for (let i = 0; i < query.length; i++) {
+    sum += query[i] * embeddings[offset + i];
+  }
+  return sum / (127 * 127);
+}
+
 /**
  * Find the K most similar items to a query vector.
  */
@@ -254,19 +268,26 @@ export function searchByVector<T>(
   topK: number = 10,
   excludeIds: Set<number> = new Set()
 ): SearchResult<T>[] {
+  if (queryVector.length !== index.embeddingDim || topK <= 0) return [];
+
+  // Keep only the best K scores. This avoids allocating one sliced embedding
+  // and one score object per item, and avoids sorting the entire collection.
   const scores: Array<{ id: number; score: number }> = [];
 
   for (let i = 0; i < index.numItems; i++) {
     if (excludeIds.has(i)) continue;
 
-    const embedding = getEmbedding(index, i);
-    const score = dotProduct(queryVector, embedding);
-    scores.push({ id: i, score });
+    const score = dotProductAt(index.embeddings, i * index.embeddingDim, queryVector);
+    const insertAt = scores.findIndex((candidate) => score > candidate.score);
+    if (insertAt === -1) {
+      if (scores.length < topK) scores.push({ id: i, score });
+    } else {
+      scores.splice(insertAt, 0, { id: i, score });
+      if (scores.length > topK) scores.pop();
+    }
   }
 
-  scores.sort((a, b) => b.score - a.score);
-
-  return scores.slice(0, topK).map(({ id, score }) => ({
+  return scores.map(({ id, score }) => ({
     id,
     score,
     metadata: index.metadata[id],
