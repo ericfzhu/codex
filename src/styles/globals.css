@@ -19,6 +19,8 @@ html,
 body {
 	padding: 0;
 	margin: 0;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
 	font-family:
 		Helvetica Neue,
 		-apple-system,
@@ -31,6 +33,15 @@ body {
 		Fira Sans,
 		Droid Sans,
 		sans-serif;
+}
+
+p {
+	text-wrap: pretty;
+}
+
+button,
+a {
+	-webkit-tap-highlight-color: transparent;
 }
 
 a {

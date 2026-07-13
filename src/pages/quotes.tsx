@@ -125,15 +125,15 @@ export default function QuotesPage() {
 	};
 
 	return (
-		<main className={`h-screen overflow-hidden flex flex-col bg-white dark:bg-gray-900 ${jetBrainsMono.className}`}>
+		<main className={`min-h-[100dvh] lg:h-[100dvh] lg:overflow-hidden flex flex-col bg-white dark:bg-gray-900 ${jetBrainsMono.className}`}>
 			<Head>
 				<title>Codex - Quotes</title>
 			</Head>
 
 			{/* Header - fixed height */}
-			<header className="h-10 shrink-0 flex items-center px-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-				<div className="flex-1 overflow-x-auto scrollbar-thin">
-					<div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+			<header className="sticky top-0 z-50 min-h-12 shrink-0 flex flex-wrap sm:flex-nowrap items-center gap-x-3 px-3 sm:px-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+				<div className="order-2 sm:order-1 basis-full sm:basis-auto sm:flex-1 overflow-x-auto no-scrollbar border-t border-gray-100 dark:border-gray-800 sm:border-0">
+					<div className="min-h-10 flex items-center gap-2 text-xs sm:text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
 						{history.length === 0 ? (
 							<span className="text-gray-400 dark:text-gray-600">No history</span>
 						) : (
@@ -142,7 +142,7 @@ export default function QuotesPage() {
 									{index > 0 && <span className="text-gray-300 dark:text-gray-600">&rarr;</span>}
 									<button
 										onClick={() => handleHistoryClick(item.id)}
-										className={`hover:text-accent ${item.id === currentId ? 'text-accent font-medium' : ''}`}>
+										className={`min-h-10 py-2 hover:text-accent active:scale-[0.96] transition-transform ${item.id === currentId ? 'text-accent font-medium' : ''}`}>
 										{item.author}
 									</button>
 								</React.Fragment>
@@ -150,16 +150,16 @@ export default function QuotesPage() {
 						)}
 					</div>
 				</div>
-				<div className="flex items-center gap-4 text-sm shrink-0 ml-4">
-					<button onClick={loadRandom} className="uppercase text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
+				<div className="order-1 sm:order-2 ml-auto flex items-center gap-1 sm:gap-2 text-xs sm:text-sm shrink-0">
+					<button onClick={loadRandom} className="min-h-10 px-2 uppercase text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white active:scale-[0.96] transition-transform">
 						Random
 					</button>
 					{currentId !== null && (
-						<Link href={`/lineage?id=${currentId}`} className="uppercase text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
+						<Link href={`/lineage?id=${currentId}`} className="min-h-10 px-2 flex items-center uppercase text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white active:scale-[0.96] transition-transform">
 							Lineage
 						</Link>
 					)}
-					<Link href="/" className="uppercase text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white flex items-center gap-1">
+					<Link href="/" className="min-h-10 px-2 uppercase text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white flex items-center gap-1 active:scale-[0.96] transition-transform">
 						<svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 							<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
 						</svg>
@@ -175,9 +175,9 @@ export default function QuotesPage() {
 			) : (
 				<>
 					{/* Main quote - fixed height */}
-					<div className="h-28 shrink-0 p-3 border-b border-gray-200 dark:border-gray-700 bg-accent text-white flex flex-col">
+					<div className="sticky top-20 sm:top-12 z-40 min-h-36 max-h-[42dvh] lg:h-32 lg:min-h-0 lg:max-h-none shrink-0 p-4 sm:px-5 sm:py-4 border-b border-gray-200 dark:border-gray-700 bg-accent text-white flex flex-col">
 						<div className="flex-1 overflow-y-auto min-h-0 mb-1">
-							<p className="text-sm leading-relaxed">{currentQuote.quote}</p>
+							<p className="text-sm sm:text-base leading-relaxed max-w-5xl">{currentQuote.quote}</p>
 						</div>
 						<div className="shrink-0 text-right text-sm">
 							<span className="font-medium">{currentQuote.author || 'Unknown'}</span>
@@ -186,17 +186,17 @@ export default function QuotesPage() {
 					</div>
 
 					{/* Matrix grid - 12 items: 3cols×4rows or 4cols×3rows */}
-					<div className="flex-1 min-h-0 grid grid-cols-3 lg:grid-cols-4 [grid-template-rows:repeat(4,minmax(0,1fr))] lg:[grid-template-rows:repeat(3,minmax(0,1fr))] gap-px bg-gray-200 dark:bg-gray-700">
+					<div className="flex-none lg:flex-1 lg:min-h-0 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 lg:[grid-template-rows:repeat(4,minmax(0,1fr))] xl:[grid-template-rows:repeat(3,minmax(0,1fr))] gap-px bg-gray-200 dark:bg-gray-700">
 						{neighbors.slice(0, 12).map((neighbor) => (
 							<button
 								key={neighbor.id}
 								onClick={() => handleNeighborClick(neighbor.id)}
-								className="group text-left p-1.5 sm:p-2 lg:p-3 bg-white dark:bg-gray-900 hover:bg-accent hover:text-white dark:hover:bg-accent transition-colors overflow-hidden">
+								className="group min-h-40 sm:min-h-44 lg:min-h-0 text-left p-4 lg:p-3 bg-white dark:bg-gray-900 hover:bg-accent hover:text-white dark:hover:bg-accent [transition-property:color,background-color,transform] active:scale-[0.96] lg:active:scale-[0.99] overflow-hidden">
 								<div className="h-full flex flex-col min-h-0">
 									<div className="flex-1 overflow-y-auto min-h-0 mb-1">
-										<p className="text-[10px] sm:text-xs lg:text-sm text-gray-900 dark:text-gray-100 group-hover:text-white">{neighbor.quote}</p>
+										<p className="text-sm leading-relaxed text-gray-900 dark:text-gray-100 group-hover:text-white">{neighbor.quote}</p>
 									</div>
-									<div className="shrink-0 flex justify-between items-end text-[10px] sm:text-xs">
+									<div className="shrink-0 flex justify-between items-end gap-2 text-xs tabular-nums">
 										<span className="font-medium text-gray-700 dark:text-gray-300 group-hover:text-white truncate">
 											{neighbor.author || 'Unknown'}
 										</span>
