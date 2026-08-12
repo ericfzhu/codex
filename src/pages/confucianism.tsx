@@ -2,9 +2,7 @@ import VerseExplorer, { type VerseExplorerConfig } from '@/components/VerseExplo
 import { loadConfucianIndex, type VerseMetadata } from '@/lib/searchClient';
 
 function formatReference(verse: VerseMetadata): string {
-	return verse.chapter && verse.verse
-		? `${verse.book} ${verse.chapter}:${verse.verse}`
-		: `${verse.book} ${verse.verse}`;
+	return verse.chapter && verse.verse ? `${verse.book} ${verse.chapter}:${verse.verse}` : `${verse.book} ${verse.verse}`;
 }
 
 const config: VerseExplorerConfig = {
@@ -15,11 +13,14 @@ const config: VerseExplorerConfig = {
 	emptyMessage: 'No passage selected',
 	formatReference,
 	accent: {
-		text: 'text-red-600',
-		hoverText: 'hover:text-red-600',
+		text: 'text-red-600 dark:text-red-400',
+		hoverText: 'hover:text-red-600 dark:hover:text-red-400',
 		background: 'bg-red-600',
 		hoverBackground: 'hover:bg-red-600',
 		darkHoverBackground: 'dark:hover:bg-red-600',
+		surface: 'bg-red-50 dark:bg-red-950/60',
+		surfaceText: 'text-red-950 dark:text-red-50',
+		separator: 'bg-red-600 dark:bg-red-500',
 	},
 };
 
