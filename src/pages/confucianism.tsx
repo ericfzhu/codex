@@ -11,6 +11,8 @@ const config: VerseExplorerConfig = {
 	loadIndex: loadConfucianIndex,
 	errorMessage: 'Confucianism embeddings not yet available. Please check back later.',
 	emptyMessage: 'No passage selected',
+	getText: (verse) => verse.text,
+	getSource: (verse) => verse.source,
 	formatReference,
 	accent: {
 		text: 'text-red-600 dark:text-red-400',

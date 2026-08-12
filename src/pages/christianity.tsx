@@ -12,6 +12,8 @@ const config: VerseExplorerConfig = {
 	route: '/christianity',
 	loadIndex: loadBibleIndex,
 	errorMessage: 'Christianity embeddings not yet available. Please check back later.',
+	getText: (verse) => verse.text,
+	getSource: (verse) => verse.source,
 	formatReference: (verse: VerseMetadata) => `${verse.book} ${verse.chapter}:${verse.verse}`,
 	formatSource: (source) => sourceNames[source] || source,
 	accent: {

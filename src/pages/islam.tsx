@@ -6,6 +6,8 @@ const config: VerseExplorerConfig = {
 	route: '/islam',
 	loadIndex: loadIslamIndex,
 	errorMessage: 'Islam embeddings not yet available. Please check back later.',
+	getText: (verse) => verse.text,
+	getSource: (verse) => verse.source,
 	formatReference: (verse: VerseMetadata) => `${verse.book} ${verse.chapter}:${verse.verse}`,
 	accent: {
 		text: 'text-emerald-600 dark:text-emerald-400',

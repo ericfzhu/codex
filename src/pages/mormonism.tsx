@@ -6,6 +6,8 @@ const config: VerseExplorerConfig = {
 	route: '/mormonism',
 	loadIndex: loadMormonIndex,
 	errorMessage: 'Mormonism embeddings not yet available. Please check back later.',
+	getText: (verse) => verse.text,
+	getSource: (verse) => verse.source,
 	formatReference: (verse: VerseMetadata) => `${verse.book} ${verse.chapter}:${verse.verse}`,
 	accent: {
 		text: 'text-blue-600 dark:text-blue-400',

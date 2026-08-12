@@ -3,90 +3,139 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { JetBrains_Mono } from 'next/font/google';
-import { loadQuotesIndex, SearchIndex, QuoteMetadata } from '@/lib/searchClient';
-import { findLineage, LineageResult, LineageItem } from '@/lib/lineageSearch';
-import ThemeToggle from '@/components/ThemeToggle';
+import { loadQuotesIndex, type QuoteMetadata, type SearchIndex } from '@/lib/searchClient';
+import { findLineage, type LineageItem, type LineageResult } from '@/lib/lineageSearch';
 import { isValidItemId, parseItemId } from '@/lib/routeIds';
 
-const jetBrainsMono = JetBrains_Mono({
-	subsets: ['latin'],
-});
+const jetBrainsMono = JetBrains_Mono({ subsets: ['latin'] });
 
-const eraColors: Record<string, string> = {
-	Ancient: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
-	Medieval: 'bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-200',
-	Renaissance: 'bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200',
-	Enlightenment: 'bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200',
-	'19th Century': 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
-	'20th Century': 'bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200',
-	Contemporary: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200',
-	Unknown: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
+const eraStyles: Record<string, string> = {
+	Ancient: 'bg-[#C58B12] text-[#211704]',
+	Medieval: 'bg-[#75685C] text-white',
+	Renaissance: 'bg-[#B83B2F] text-white',
+	Enlightenment: 'bg-[#2E55B8] text-white',
+	'19th Century': 'bg-[#176B4D] text-white',
+	'20th Century': 'bg-[#55318F] text-white',
+	Contemporary: 'bg-[#91354F] text-white',
+	Unknown: 'bg-[#3B3B3F] text-white',
 };
 
-function LineageCard({ item, isSource = false }: { item: LineageItem; isSource?: boolean }) {
+function formatYear(item: LineageItem): string {
+	if (item.year === undefined) return 'undated';
+	if (item.year < 0) return `${Math.abs(item.year)} BCE`;
+	return String(item.year);
+}
+
+function SourcePanel({ item, echoCount }: { item: LineageItem; echoCount: number }) {
 	return (
-		<div
-			className={`p-4 rounded-lg border ${
-				isSource ? 'border-accent bg-accent/5 dark:bg-accent/10' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
-			}`}>
-			<div className="flex items-start justify-between gap-2 mb-2">
-				<span className={`text-xs px-2 py-0.5 rounded-full ${eraColors[item.era]}`}>{item.year ? item.year : item.era}</span>
-				{!isSource && <span className="text-xs text-gray-400 dark:text-gray-500">{(item.similarity * 100).toFixed(0)}% similar</span>}
+		<aside className="flex flex-col bg-[#55318F] text-white lg:min-h-0 lg:overflow-y-auto">
+			<div className="flex items-start justify-between gap-5 border-b border-white/20 p-5 text-[10px] uppercase tracking-[0.18em] text-white/60 sm:p-7">
+				<span>source</span>
+				<span className="tabular-nums">{String(echoCount).padStart(2, '0')} echoes</span>
 			</div>
-			<p className="text-sm text-gray-900 dark:text-gray-100 mb-3 line-clamp-4">{item.quote}</p>
-			<div className="flex items-center justify-between">
-				<div>
-					<p className="font-medium text-gray-900 dark:text-white text-sm">{item.author || 'Unknown'}</p>
-					{item.book_title && <p className="text-xs text-gray-500 dark:text-gray-400 italic">{item.book_title}</p>}
+
+			<div className="flex flex-1 flex-col justify-between p-5 sm:p-7 lg:p-8">
+				<p className="max-w-3xl text-lg leading-relaxed text-pretty sm:text-xl lg:text-[clamp(1.05rem,1.55vw,1.45rem)]">{item.quote}</p>
+
+				<div className="mt-12">
+					<div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-5 border-t border-white/20 pt-5">
+						<div className="min-w-0">
+							<p className="truncate text-sm font-medium">{item.author || 'Unknown author'}</p>
+							{item.book_title && <p className="mt-1 truncate text-xs text-white/55">{item.book_title}</p>}
+						</div>
+						<div className="text-right">
+							<p className="text-xl tabular-nums">{formatYear(item)}</p>
+							<p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-white/55">{item.era}</p>
+						</div>
+					</div>
+
+					<Link
+						href={`/quotes?id=${item.id}`}
+						className="mt-6 flex min-h-10 w-fit items-center border border-white/35 px-3 text-xs transition-[background-color,scale] duration-150 ease-out hover:bg-white/10 active:scale-[0.96]">
+						open source &rarr;
+					</Link>
 				</div>
-				<Link href={`/quotes?id=${item.id}`} className="text-xs text-accent hover:underline">
-					Explore &rarr;
-				</Link>
 			</div>
-		</div>
+		</aside>
 	);
 }
 
-function TimelineView({ result }: { result: LineageResult }) {
-	// Group by era
+function EchoRecord({ item, index }: { item: LineageItem; index: number }) {
+	const affinity = Math.max(0, Math.min(100, item.similarity * 100));
+
+	return (
+		<Link
+			href={`/quotes?id=${item.id}`}
+			className="group relative grid min-h-52 grid-cols-[5rem_minmax(0,1fr)] border-b border-black/20 bg-[#F1EEE8] text-[#17141F] outline-none transition-[background-color,color,transform] duration-200 ease-out hover:bg-[#55318F] hover:text-white focus-visible:bg-[#55318F] focus-visible:text-white active:scale-[0.96] sm:grid-cols-[7.5rem_minmax(0,1fr)]">
+			<div className="flex flex-col justify-between border-r border-black/20 p-4 transition-colors duration-200 group-hover:border-white/20 group-focus-visible:border-white/20 sm:p-5">
+				<span className="text-[10px] tabular-nums opacity-45">{String(index + 1).padStart(2, '0')}</span>
+				<span className="text-sm tabular-nums">{formatYear(item)}</span>
+			</div>
+
+			<div className="flex min-w-0 flex-col justify-between p-4 sm:p-5">
+				<div className="flex items-start justify-between gap-5">
+					<p className="line-clamp-6 max-w-3xl text-sm leading-relaxed text-pretty sm:text-base">{item.quote}</p>
+					<span className="hidden shrink-0 text-xs tabular-nums opacity-50 sm:block">{affinity.toFixed(0)}%</span>
+				</div>
+
+				<div className="mt-8 flex items-end justify-between gap-4 text-xs">
+					<div className="min-w-0">
+						<span className="block truncate font-medium">{item.author || 'Unknown author'}</span>
+						{item.book_title && <span className="mt-1 block truncate opacity-55">{item.book_title}</span>}
+					</div>
+					<span className="shrink-0 tabular-nums opacity-50 sm:hidden">{affinity.toFixed(0)}%</span>
+				</div>
+			</div>
+
+			<div className="absolute inset-x-0 bottom-0 h-1 bg-black/10 group-hover:bg-white/15 group-focus-visible:bg-white/15">
+				<div
+					className="h-full bg-[#55318F] transition-[background-color] duration-200 group-hover:bg-white group-focus-visible:bg-white"
+					style={{ width: `${affinity}%` }}
+				/>
+			</div>
+		</Link>
+	);
+}
+
+function HistoricalStrata({ result }: { result: LineageResult }) {
 	const byEra = new Map<string, LineageItem[]>();
 	for (const item of result.lineage) {
-		const existing = byEra.get(item.era) || [];
+		const existing = byEra.get(item.era) ?? [];
 		existing.push(item);
 		byEra.set(item.era, existing);
 	}
 
-	const eras = Array.from(byEra.keys());
+	let itemIndex = 0;
 
 	return (
-		<div className="relative">
-			{/* Timeline line */}
-			<div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700" />
-
-			{/* Source quote */}
-			<div className="relative mb-8">
-				<div className="absolute left-4 w-3 h-3 -translate-x-1/2 rounded-full bg-accent border-4 border-white dark:border-gray-900" />
-				<div className="ml-10">
-					<p className="text-xs text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Source Quote</p>
-					<LineageCard item={result.sourceQuote} isSource />
-				</div>
+		<section className="bg-[#17141F] lg:min-h-0 lg:overflow-y-auto" aria-label="Historical echoes">
+			<div className="flex min-h-14 items-center justify-between border-b border-white/15 px-4 text-[10px] uppercase tracking-[0.16em] text-white/50 sm:px-5">
+				<span>earliest</span>
+				<span>affinity</span>
+				<span>latest</span>
 			</div>
 
-			{/* Era groups */}
-			{eras.map((era) => (
-				<div key={era} className="relative mb-8">
-					<div className="absolute left-4 w-2 h-2 -translate-x-1/2 rounded-full bg-gray-300 dark:bg-gray-600" />
-					<div className="ml-10">
-						<p className="text-xs text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wider">{era}</p>
-						<div className="space-y-3">
-							{byEra.get(era)?.map((item) => (
-								<LineageCard key={item.id} item={item} />
-							))}
-						</div>
-					</div>
-				</div>
-			))}
-		</div>
+			{Array.from(byEra.entries()).map(([era, items]) => {
+				const eraId = `era-${era.replaceAll(' ', '-').toLowerCase()}`;
+				return (
+					<section key={era} aria-labelledby={eraId}>
+						<header
+							className={`sticky top-16 z-20 flex min-h-14 items-center justify-between gap-5 border-b border-black/20 px-4 lg:top-0 sm:px-5 ${eraStyles[era] ?? eraStyles.Unknown}`}>
+							<h2 id={eraId} className="text-sm uppercase tracking-[-0.03em] sm:text-base">
+								{era}
+							</h2>
+							<span className="text-[10px] tabular-nums opacity-65">{String(items.length).padStart(2, '0')}</span>
+						</header>
+
+						{items.map((item) => {
+							const index = itemIndex;
+							itemIndex += 1;
+							return <EchoRecord key={item.id} item={item} index={index} />;
+						})}
+					</section>
+				);
+			})}
+		</section>
 	);
 }
 
@@ -95,78 +144,96 @@ export default function LineagePage() {
 	const [searchIndex, setSearchIndex] = useState<SearchIndex<QuoteMetadata> | null>(null);
 	const [result, setResult] = useState<LineageResult | null>(null);
 	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState<string | null>(null);
 
-	// Load search index
 	useEffect(() => {
+		let cancelled = false;
+		setError(null);
 		loadQuotesIndex()
-			.then(setSearchIndex)
-			.catch((err) => console.error('Failed to load search index:', err));
+			.then((index) => {
+				if (!cancelled) setSearchIndex(index);
+			})
+			.catch((loadError) => {
+				console.error('Failed to load search index:', loadError);
+				if (!cancelled) {
+					setError('The quote index could not be loaded.');
+					setLoading(false);
+				}
+			});
+		return () => {
+			cancelled = true;
+		};
 	}, []);
 
-	// Load lineage when index and id are ready
 	useEffect(() => {
 		if (!router.isReady || !searchIndex) return;
 
 		const id = parseItemId(router.query.id);
 		if (!isValidItemId(id, searchIndex.numItems)) {
+			setResult(null);
 			setLoading(false);
 			return;
 		}
 
 		setLoading(true);
-		const lineageResult = findLineage(searchIndex, id);
-		setResult(lineageResult);
+		setResult(findLineage(searchIndex, id));
 		setLoading(false);
 	}, [router.isReady, router.query.id, searchIndex]);
 
+	const sourceId = result?.sourceQuote.id;
+
 	return (
-		<main className={`min-h-screen bg-gray-50 dark:bg-gray-900 ${jetBrainsMono.className}`}>
+		<main className={`min-h-[100dvh] bg-[#17141F] text-white lg:h-[100dvh] lg:overflow-hidden ${jetBrainsMono.className}`}>
 			<Head>
 				<title>Codex - Lineage</title>
 			</Head>
 
-			{/* Header */}
-			<header className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-				<div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-					<div className="flex items-center gap-4">
-						<button onClick={() => router.back()} className="text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
-							<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-							</svg>
-						</button>
-						<h1 className="text-xl font-bold text-gray-900 dark:text-white uppercase">Lineage</h1>
-					</div>
-					<ThemeToggle />
-				</div>
+			<header className="sticky top-0 z-50 flex min-h-16 items-center justify-between gap-5 border-b border-white/15 bg-[#17141F] px-4 sm:px-5 lg:static">
+				<h1 className="text-xl uppercase tracking-[-0.06em] sm:text-2xl">Lineage</h1>
+				<nav className="flex shrink-0 items-center gap-1 text-xs" aria-label="Lineage navigation">
+					<Link
+						href={sourceId === undefined ? '/quotes' : `/quotes?id=${sourceId}`}
+						className="flex min-h-10 items-center px-2 text-white/60 transition-[color,scale] duration-150 ease-out hover:text-white active:scale-[0.96]">
+						&larr; quotes
+					</Link>
+					<Link
+						href="/"
+						className="flex min-h-10 min-w-10 items-center justify-center text-white/60 transition-[color,scale] duration-150 ease-out hover:text-white active:scale-[0.96]">
+						/
+					</Link>
+				</nav>
 			</header>
 
-			<div className="max-w-4xl mx-auto px-4 py-8">
-				{loading ? (
-					<div className="text-center py-16">
-						<p className="text-gray-500 dark:text-gray-400">Loading...</p>
-					</div>
-				) : !result ? (
-					<div className="text-center py-16">
-						<p className="text-gray-500 dark:text-gray-400 mb-4">No quote selected.</p>
-						<p className="text-sm text-gray-400 dark:text-gray-500 mb-6">
-							Select a quote from the quotes page to see how similar ideas appear across different authors and eras.
-						</p>
+			{loading ? (
+				<div className="flex min-h-[calc(100dvh-4rem)] items-center justify-center">
+					<p className="text-xs uppercase tracking-[0.16em] text-white/50">Tracing lineage…</p>
+				</div>
+			) : error ? (
+				<div className="flex min-h-[calc(100dvh-4rem)] flex-col items-center justify-center px-6 text-center">
+					<p className="text-sm text-white/60">{error}</p>
+					<Link
+						href="/quotes"
+						className="mt-6 flex min-h-10 items-center border border-white/25 px-4 text-xs transition-[background-color,scale] hover:bg-white/10 active:scale-[0.96]">
+						return to quotes
+					</Link>
+				</div>
+			) : !result ? (
+				<div className="grid min-h-[calc(100dvh-4rem)] place-items-center px-5">
+					<div className="w-full max-w-xl bg-[#55318F] p-6 sm:p-8">
+						<p className="text-xl uppercase tracking-[-0.04em]">No source quote</p>
 						<Link
 							href="/quotes"
-							className="inline-flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors">
-							<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-							</svg>
-							Go to Quotes
+							className="mt-8 inline-flex min-h-10 items-center border border-white/40 px-4 text-xs transition-[background-color,scale] hover:bg-white/10 active:scale-[0.96]">
+							open quotes &rarr;
 						</Link>
 					</div>
-				) : (
-					<>
-						<p className="text-sm text-gray-500 dark:text-gray-400 mb-8">Tracing how this idea appears throughout history.</p>
-						<TimelineView result={result} />
-					</>
-				)}
-			</div>
+				</div>
+			) : (
+				<div className="lg:grid lg:h-[calc(100dvh-4rem)] lg:grid-cols-[minmax(20rem,43%)_minmax(0,57%)]">
+					<SourcePanel item={result.sourceQuote} echoCount={result.lineage.length} />
+					<HistoricalStrata result={result} />
+				</div>
+			)}
 		</main>
 	);
 }

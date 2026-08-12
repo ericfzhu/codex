@@ -31,23 +31,32 @@ interface SystemTilePositions {
 const selectedStylesByRoute = new Map<string, number>();
 const selectedSystemTilePositionsByRoute = new Map<string, SystemTilePositions>();
 
-interface Neighbor extends VerseMetadata {
-	score: number;
-}
+type Neighbor<T> = T & { id: number; score: number };
 
 interface HistoryItem {
 	id: number;
 	reference: string;
 }
 
-export interface VerseExplorerConfig {
+interface ExplorerMetadata {
+	id: number;
+}
+
+export interface VerseExplorerConfig<T extends ExplorerMetadata = VerseMetadata> {
 	title: string;
 	route: string;
-	loadIndex: () => Promise<SearchIndex<VerseMetadata>>;
+	loadIndex: () => Promise<SearchIndex<T>>;
 	errorMessage: string;
 	emptyMessage?: string;
-	formatReference: (verse: VerseMetadata) => string;
+	itemNoun?: string;
+	getText: (item: T) => string;
+	getSource: (item: T) => string;
+	formatReference: (item: T) => string;
 	formatSource?: (source: string) => string;
+	utilityLink?: {
+		label: string;
+		href: (id: number) => string;
+	};
 	accent: {
 		text: string;
 		hoverText: string;
@@ -60,12 +69,12 @@ export interface VerseExplorerConfig {
 	};
 }
 
-export default function VerseExplorer({ config }: { config: VerseExplorerConfig }) {
+export default function VerseExplorer<T extends ExplorerMetadata = VerseMetadata>({ config }: { config: VerseExplorerConfig<T> }) {
 	const router = useRouter();
-	const [searchIndex, setSearchIndex] = useState<SearchIndex<VerseMetadata> | null>(null);
-	const [currentVerse, setCurrentVerse] = useState<VerseMetadata | null>(null);
+	const [searchIndex, setSearchIndex] = useState<SearchIndex<T> | null>(null);
+	const [currentVerse, setCurrentVerse] = useState<T | null>(null);
 	const [currentId, setCurrentId] = useState<number | null>(null);
-	const [neighbors, setNeighbors] = useState<Neighbor[]>([]);
+	const [neighbors, setNeighbors] = useState<Neighbor<T>[]>([]);
 	const [history, setHistory] = useState<HistoryItem[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [loadingProgress, setLoadingProgress] = useState(6);
@@ -159,10 +168,11 @@ export default function VerseExplorer({ config }: { config: VerseExplorerConfig 
 			if (!verse) return;
 
 			const uniqueTexts = new Set<string>();
-			const neighborList: Neighbor[] = [];
+			const neighborList: Neighbor<T>[] = [];
 			for (const result of searchById(searchIndex, id, 20)) {
-				if (result.metadata.text !== verse.text && !uniqueTexts.has(result.metadata.text)) {
-					uniqueTexts.add(result.metadata.text);
+				const resultText = config.getText(result.metadata);
+				if (resultText !== config.getText(verse) && !uniqueTexts.has(resultText)) {
+					uniqueTexts.add(resultText);
 					neighborList.push({ ...result.metadata, id: result.id, score: result.score });
 				}
 			}
@@ -256,6 +266,10 @@ export default function VerseExplorer({ config }: { config: VerseExplorerConfig 
 	] as const;
 
 	const explorerStyle = explorerStyles[styleIndex];
+	const neighborHoverStyles =
+		explorerStyle.name === 'bloom'
+			? 'hover:bg-gray-950 hover:text-white dark:hover:bg-white dark:hover:text-gray-950'
+			: `${config.accent.hoverBackground} hover:text-white ${config.accent.darkHoverBackground}`;
 
 	const cycleStyle = (direction: number) => {
 		setStyleIndex((currentIndex) => {
@@ -266,19 +280,19 @@ export default function VerseExplorer({ config }: { config: VerseExplorerConfig 
 		});
 	};
 
-	const renderNeighbor = (neighbor: Neighbor, gridSlot: number) => (
+	const renderNeighbor = (neighbor: Neighbor<T>, gridSlot: number) => (
 		<button
 			key={neighbor.id}
 			data-grid-role="neighbor"
 			data-grid-slot={gridSlot + 1}
 			onClick={() => navigateTo(neighbor.id)}
-			className={`group min-h-44 lg:min-h-0 w-full overflow-hidden p-4 text-left ${LARGE_GRID_ORDER_CLASSES[gridSlot]} ${explorerStyle.related} ${explorerStyle.relatedText} ${config.accent.hoverBackground} hover:text-white ${config.accent.darkHoverBackground} transition-[color,background-color,scale] duration-200 ease-out active:scale-[0.96]`}>
+			className={`group min-h-44 lg:min-h-0 w-full overflow-hidden p-4 text-left ${LARGE_GRID_ORDER_CLASSES[gridSlot]} ${explorerStyle.related} ${explorerStyle.relatedText} ${neighborHoverStyles} transition-[color,background-color,scale] duration-200 ease-out active:scale-[0.96]`}>
 			<div className="flex h-full min-h-0 flex-col justify-between">
-				<p className="line-clamp-6 overflow-hidden text-sm leading-relaxed text-pretty lg:line-clamp-5">{neighbor.text}</p>
+				<p className="line-clamp-6 overflow-hidden text-sm leading-relaxed text-pretty lg:line-clamp-5">{config.getText(neighbor)}</p>
 				<div className="mt-5 flex shrink-0 items-end justify-between gap-3 text-xs tabular-nums">
 					<div className="min-w-0">
 						<span className="block truncate font-medium">{config.formatReference(neighbor)}</span>
-						<span className="block truncate opacity-60">{formatSource(neighbor.source)}</span>
+						<span className="block truncate opacity-60">{formatSource(config.getSource(neighbor))}</span>
 					</div>
 					<span className="shrink-0 opacity-60">{(neighbor.score * 100).toFixed(0)}%</span>
 				</div>
@@ -323,10 +337,10 @@ export default function VerseExplorer({ config }: { config: VerseExplorerConfig 
 						className={`flex min-h-56 flex-col justify-between p-5 sm:col-span-2 lg:min-h-0 ${explorerStyle.selected} ${explorerStyle.selectedText}`}>
 						<div className="flex items-start justify-between gap-4 text-xs">
 							<span className={`font-medium lowercase ${explorerStyle.accentText}`}>{config.title}</span>
-							<span className="max-w-[55%] text-right opacity-70">{formatSource(currentVerse.source)}</span>
+							<span className="max-w-[55%] text-right opacity-70">{formatSource(config.getSource(currentVerse))}</span>
 						</div>
 						<p className="my-6 min-h-0 max-w-3xl overflow-y-auto text-base leading-relaxed text-pretty no-scrollbar sm:text-lg">
-							{currentVerse.text}
+							{config.getText(currentVerse)}
 						</p>
 						<span className="self-end text-sm font-medium tabular-nums">{config.formatReference(currentVerse)}</span>
 					</section>
@@ -365,11 +379,20 @@ export default function VerseExplorer({ config }: { config: VerseExplorerConfig 
 								<br />
 								connections
 							</button>
-							<Link
-								href="/"
-								className="flex min-h-10 items-center px-1 text-right opacity-70 transition-[opacity,scale] duration-150 ease-out hover:opacity-100 active:scale-[0.96]">
-								&larr; /
-							</Link>
+							<div className="flex flex-col items-end text-xs">
+								{config.utilityLink && currentId !== null && (
+									<Link
+										href={config.utilityLink.href(currentId)}
+										className="flex min-h-10 items-center px-1 opacity-70 transition-[opacity,scale] duration-150 ease-out hover:opacity-100 active:scale-[0.96]">
+										{config.utilityLink.label} &rarr;
+									</Link>
+								)}
+								<Link
+									href="/"
+									className="flex min-h-10 items-center px-1 text-right opacity-70 transition-[opacity,scale] duration-150 ease-out hover:opacity-100 active:scale-[0.96]">
+									&larr; /
+								</Link>
+							</div>
 						</div>
 					</section>
 
@@ -399,7 +422,7 @@ export default function VerseExplorer({ config }: { config: VerseExplorerConfig 
 								))
 							)}
 						</div>
-						<span className="text-xs opacity-60">select a passage to recenter</span>
+						<span className="text-xs opacity-60">select {config.itemNoun ?? 'a passage'} to recenter</span>
 					</section>
 
 					{neighborTiles.slice(3)}

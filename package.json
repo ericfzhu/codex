@@ -6,6 +6,7 @@
 	"scripts": {
 		"dev": "next dev",
 		"build": "next build",
+		"cloud:generate": "python3 scripts/generate-cloud.py",
 		"start": "next start",
 		"lint": "next lint",
 		"prettier": "prettier --write ."
