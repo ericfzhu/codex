@@ -367,13 +367,13 @@ def semantic_neighbours(
     matrix: np.ndarray,
     count: int,
     seed: int,
-    cached: np.ndarray | None = None,
 ) -> tuple[np.ndarray, dict[str, float]]:
     log(f"\nBuilding semantic neighbour index ({len(matrix):,} points, {matrix.shape[1]} dimensions)…")
-    neighbours = cached if cached is not None else approximate_knn(matrix, count, seed, "cosine")
+    neighbours = approximate_knn(matrix, count, seed, "cosine")
 
     rng = np.random.default_rng(seed)
-    validation_indices = np.sort(rng.choice(len(matrix), size=min(400, len(matrix)), replace=False))
+    validation_size = 100 if matrix.shape[1] > 100 else 400
+    validation_indices = np.sort(rng.choice(len(matrix), size=min(validation_size, len(matrix)), replace=False))
     recalls = []
     for source in validation_indices:
         scores = matrix @ matrix[source]
@@ -382,7 +382,8 @@ def semantic_neighbours(
         recalls.append(len(exact.intersection(neighbours[source])) / count)
     report = {
         "semanticNeighbourCount": count,
-        "index": "PyNNDescent cosine on normalized PCA space",
+        "index": "PyNNDescent cosine on normalized source embeddings",
+        "dimensions": int(matrix.shape[1]),
         "nTrees": 48,
         "nIters": 12,
         "annRecallAt8": round(float(np.mean(recalls)), 6),
@@ -494,8 +495,6 @@ def main() -> None:
         "explainedVariance": round(float(pca.explained_variance_ratio_.sum()), 6),
         "durationSeconds": round(time.time() - pca_started, 2),
     }
-    del raw_matrix
-
     if args.algorithm == "auto":
         winner, benchmark_results = benchmark(semantic_matrix, items, args.benchmark_size, args.seed)
         report["benchmark"] = benchmark_results
@@ -505,7 +504,7 @@ def main() -> None:
 
     log(f"\nProjecting the complete cleaned corpus with {winner.key}…")
     projection_started = time.time()
-    coords, projected_neighbours = project(semantic_matrix, winner, args.seed, args.verbose, return_neighbours=True)
+    coords, _ = project(semantic_matrix, winner, args.seed, args.verbose)
     report["selected"] = {
         "key": winner.key,
         "family": winner.family,
@@ -515,8 +514,9 @@ def main() -> None:
         **quality_metrics(semantic_matrix, coords, args.seed),
     }
 
-    neighbours, neighbour_report = semantic_neighbours(semantic_matrix, NEIGHBOUR_COUNT, args.seed, projected_neighbours)
+    neighbours, neighbour_report = semantic_neighbours(raw_matrix, NEIGHBOUR_COUNT, args.seed)
     report["neighbours"] = neighbour_report
+    del raw_matrix
     report["durationSeconds"] = round(time.time() - started, 2)
 
     log("\nWriting compact graph and metadata artifacts…")

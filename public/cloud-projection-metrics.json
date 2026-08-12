@@ -42,7 +42,7 @@
     }
   ],
   "version": 2,
-  "generatedAt": "2026-08-12T14:12:31Z",
+  "generatedAt": "2026-08-12T14:21:01Z",
   "seed": 37495,
   "inputRows": 68278,
   "outputPoints": 62217,
@@ -52,7 +52,7 @@
     "inputDimensions": 1024,
     "outputDimensions": 50,
     "explainedVariance": 0.531953,
-    "durationSeconds": 0.49
+    "durationSeconds": 0.6
   },
   "benchmark": [
     {
@@ -62,7 +62,7 @@
       "minDist": null,
       "sampleSize": 10000,
       "score": 0.591676,
-      "durationSeconds": 12.32,
+      "durationSeconds": 11.96,
       "trustworthiness15": 0.909378,
       "neighbourRecall15": 0.170613,
       "globalDistanceSpearman": 0.429013
@@ -74,7 +74,7 @@
       "minDist": 0.15,
       "sampleSize": 10000,
       "score": 0.597767,
-      "durationSeconds": 19.44,
+      "durationSeconds": 18.99,
       "trustworthiness15": 0.913145,
       "neighbourRecall15": 0.18056,
       "globalDistanceSpearman": 0.43513,
@@ -87,7 +87,7 @@
       "minDist": 0.25,
       "sampleSize": 10000,
       "score": 0.59279,
-      "durationSeconds": 17.34,
+      "durationSeconds": 16.68,
       "trustworthiness15": 0.900376,
       "neighbourRecall15": 0.16376,
       "globalDistanceSpearman": 0.467368
@@ -98,17 +98,18 @@
     "family": "umap",
     "nNeighbors": 30,
     "minDist": 0.15,
-    "durationSeconds": 41.37,
+    "durationSeconds": 41.34,
     "trustworthiness15": 0.898446,
     "neighbourRecall15": 0.175013,
     "globalDistanceSpearman": 0.423747
   },
   "neighbours": {
     "semanticNeighbourCount": 8,
-    "index": "PyNNDescent cosine on normalized PCA space",
+    "index": "PyNNDescent cosine on normalized source embeddings",
+    "dimensions": 1024,
     "nTrees": 48,
     "nIters": 12,
-    "annRecallAt8": 0.981563
+    "annRecallAt8": 0.92875
   },
-  "durationSeconds": 121.27
+  "durationSeconds": 124.39
 }
