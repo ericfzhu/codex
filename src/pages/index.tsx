@@ -12,56 +12,48 @@ const destinations = [
 	{
 		id: 'quotes',
 		label: 'Quotes',
-		description: 'Writers, thinkers, fragments.',
 		href: '/quotes',
 		className: 'bg-[#55318F] text-white hover:bg-[#432370] focus-visible:bg-[#432370]',
 	},
 	{
 		id: 'christianity',
 		label: 'Christianity',
-		description: 'Scripture in conversation.',
 		href: '/christianity',
 		className: 'bg-[#C58B12] text-[#211704] hover:bg-[#D9A023] focus-visible:bg-[#D9A023]',
 	},
 	{
 		id: 'islam',
 		label: 'Islam',
-		description: 'The Qur’an through shared ideas.',
 		href: '/islam',
 		className: 'bg-[#176B4D] text-white hover:bg-[#10563D] focus-visible:bg-[#10563D]',
 	},
 	{
 		id: 'mormonism',
 		label: 'Mormonism',
-		description: 'Restoration texts, connected.',
 		href: '/mormonism',
 		className: 'bg-[#2E55B8] text-white hover:bg-[#234597] focus-visible:bg-[#234597]',
 	},
 	{
 		id: 'confucianism',
 		label: 'Confucianism',
-		description: 'The Analects in relation.',
 		href: '/confucianism',
 		className: 'bg-[#B83B2F] text-white hover:bg-[#963127] focus-visible:bg-[#963127]',
 	},
 	{
 		id: 'cloud',
 		label: 'Memetic Cloud',
-		description: 'See the whole field at once.',
 		href: '/cloud',
 		className: 'bg-[#262331] text-white hover:bg-[#383344] focus-visible:bg-[#383344]',
 	},
 	{
 		id: 'changelog',
 		label: 'Changelog',
-		description: 'Notes from the workshop.',
 		href: '/changelog',
 		className: 'bg-[#75685C] text-white hover:bg-[#5E5349] focus-visible:bg-[#5E5349]',
 	},
 	{
 		id: 'github',
 		label: 'GitHub',
-		description: 'Read the source.',
 		href: 'https://github.com/ericfzhu/codex',
 		external: true,
 		className: 'bg-[#3B3B3F] text-white hover:bg-[#27272A] focus-visible:bg-[#27272A]',
@@ -69,7 +61,6 @@ const destinations = [
 	{
 		id: 'works',
 		label: 'Other Works',
-		description: 'Essays, tools, and experiments.',
 		href: 'https://ericfzhu.com/works',
 		external: true,
 		className: 'bg-[#91354F] text-white hover:bg-[#71273C] focus-visible:bg-[#71273C]',
@@ -149,8 +140,7 @@ export default function HomePage() {
 					isReady ? 'opacity-100' : 'opacity-0'
 				}`}>
 				<header className="relative flex min-h-[22rem] flex-col justify-between overflow-hidden bg-accent p-6 text-white md:col-span-2 lg:order-none lg:min-h-0 lg:p-8">
-					<div className="flex items-start justify-between gap-6">
-						<p className="text-[10px] uppercase tracking-[0.22em] text-white/65">An index of affinities</p>
+					<div className="flex items-start justify-end gap-6">
 						<p className="text-[10px] tabular-nums text-white/65">EST. 2024</p>
 					</div>
 
@@ -158,9 +148,6 @@ export default function HomePage() {
 						<h1 className="text-5xl font-medium uppercase leading-none tracking-[-0.08em] sm:text-7xl lg:text-[clamp(3.5rem,6.5vw,7rem)]">
 							Codex
 						</h1>
-						<p className="mt-4 max-w-sm text-sm leading-relaxed text-white/80">
-							A playful index of ideas. Pick a door; every path opens onto another.
-						</p>
 					</div>
 				</header>
 
@@ -179,7 +166,6 @@ export default function HomePage() {
 						</div>
 						<div>
 							<h2 className="text-xl font-medium uppercase leading-none tracking-[-0.05em] xl:text-2xl">{destination.label}</h2>
-							<p className="mt-2 text-xs leading-relaxed opacity-65">{destination.description}</p>
 						</div>
 					</Link>
 				))}
@@ -198,7 +184,6 @@ export default function HomePage() {
 					</div>
 					<div>
 						<p className="text-xl font-medium uppercase leading-none tracking-[-0.05em] xl:text-2xl">Shuffle the index</p>
-						<p className="mt-2 text-xs leading-relaxed text-white/65">Same doors, another arrangement.</p>
 					</div>
 				</button>
 			</section>
