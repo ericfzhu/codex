@@ -1,0 +1,114 @@
+{
+  "collections": [
+    {
+      "slug": "quotes",
+      "label": "PHILOSOPHY",
+      "inputRows": 4938,
+      "uniqueRows": 4935,
+      "collapsedRows": 3,
+      "vectorSource": "int8:quotes-embeddings-int8.bin"
+    },
+    {
+      "slug": "christianity",
+      "label": "CHRISTIANITY",
+      "inputRows": 42548,
+      "uniqueRows": 36633,
+      "collapsedRows": 5915,
+      "vectorSource": "int8:bible-embeddings-int8-0.bin+bible-embeddings-int8-1.bin+bible-embeddings-int8-2.bin"
+    },
+    {
+      "slug": "islam",
+      "label": "ISLAM",
+      "inputRows": 13240,
+      "uniqueRows": 13107,
+      "collapsedRows": 133,
+      "vectorSource": "float32:islam-embeddings.bin"
+    },
+    {
+      "slug": "mormonism",
+      "label": "MORMONISM",
+      "inputRows": 6585,
+      "uniqueRows": 6576,
+      "collapsedRows": 9,
+      "vectorSource": "float32:mormon-embeddings.bin"
+    },
+    {
+      "slug": "confucianism",
+      "label": "CONFUCIANISM",
+      "inputRows": 967,
+      "uniqueRows": 966,
+      "collapsedRows": 1,
+      "vectorSource": "float32:confucian-embeddings.bin"
+    }
+  ],
+  "version": 2,
+  "generatedAt": "2026-08-12T14:12:31Z",
+  "seed": 37495,
+  "inputRows": 68278,
+  "outputPoints": 62217,
+  "deduplication": "NFKC + case-fold + punctuation/whitespace normalization, within each collection",
+  "densityPolicy": "corpus-proportional after deduplication; no collection sampling in the final map",
+  "pca": {
+    "inputDimensions": 1024,
+    "outputDimensions": 50,
+    "explainedVariance": 0.531953,
+    "durationSeconds": 0.49
+  },
+  "benchmark": [
+    {
+      "key": "pacmap-30",
+      "family": "pacmap",
+      "nNeighbors": 30,
+      "minDist": null,
+      "sampleSize": 10000,
+      "score": 0.591676,
+      "durationSeconds": 12.32,
+      "trustworthiness15": 0.909378,
+      "neighbourRecall15": 0.170613,
+      "globalDistanceSpearman": 0.429013
+    },
+    {
+      "key": "umap-30-015",
+      "family": "umap",
+      "nNeighbors": 30,
+      "minDist": 0.15,
+      "sampleSize": 10000,
+      "score": 0.597767,
+      "durationSeconds": 19.44,
+      "trustworthiness15": 0.913145,
+      "neighbourRecall15": 0.18056,
+      "globalDistanceSpearman": 0.43513,
+      "secondSeedDistanceSpearman": 0.98585
+    },
+    {
+      "key": "umap-50-025",
+      "family": "umap",
+      "nNeighbors": 50,
+      "minDist": 0.25,
+      "sampleSize": 10000,
+      "score": 0.59279,
+      "durationSeconds": 17.34,
+      "trustworthiness15": 0.900376,
+      "neighbourRecall15": 0.16376,
+      "globalDistanceSpearman": 0.467368
+    }
+  ],
+  "selected": {
+    "key": "umap-30-015",
+    "family": "umap",
+    "nNeighbors": 30,
+    "minDist": 0.15,
+    "durationSeconds": 41.37,
+    "trustworthiness15": 0.898446,
+    "neighbourRecall15": 0.175013,
+    "globalDistanceSpearman": 0.423747
+  },
+  "neighbours": {
+    "semanticNeighbourCount": 8,
+    "index": "PyNNDescent cosine on normalized PCA space",
+    "nTrees": 48,
+    "nIters": 12,
+    "annRecallAt8": 0.981563
+  },
+  "durationSeconds": 121.27
+}

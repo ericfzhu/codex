@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { CloudDataItem } from '@/types';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CloudCollection, CloudMetadataPayload, CloudPoint, CloudPointsPayload } from '@/types';
 
-interface Point {
+interface RenderPoint {
+	index: number;
 	x: number;
 	y: number;
-	item: CloudDataItem;
+	point: CloudPoint;
 }
 
 interface Filter {
@@ -13,13 +14,21 @@ interface Filter {
 }
 
 interface CloudProps {
-	data: CloudDataItem[];
 	showFilters: boolean;
 	onToggleFilters: () => void;
 }
 
-// WebGL shaders for high-performance point rendering
-const vertexShaderSource = `
+interface Buffers {
+	position: WebGLBuffer | null;
+	color: WebGLBuffer | null;
+	size: WebGLBuffer | null;
+	isLocked: WebGLBuffer | null;
+	connections: WebGLBuffer | null;
+}
+
+const POINT_SCALE = 600;
+
+const pointVertexShader = `
 	attribute vec2 a_position;
 	attribute vec3 a_color;
 	attribute float a_size;
@@ -30,15 +39,16 @@ const vertexShaderSource = `
 	varying vec3 v_color;
 	varying float v_isLocked;
 	void main() {
-		vec2 pos = (a_position * u_scale + u_translation) / u_resolution * 2.0;
-		gl_Position = vec4(pos.x, -pos.y, 0, 1);
+		vec2 screen = a_position * u_scale + u_translation + u_resolution * 0.5;
+		vec2 clip = screen / u_resolution * 2.0 - 1.0;
+		gl_Position = vec4(clip.x, -clip.y, 0, 1);
 		gl_PointSize = a_size;
 		v_color = a_color;
 		v_isLocked = a_isLocked;
 	}
 `;
 
-const fragmentShaderSource = `
+const pointFragmentShader = `
 	precision mediump float;
 	varying vec3 v_color;
 	varying float v_isLocked;
@@ -46,12 +56,30 @@ const fragmentShaderSource = `
 		vec2 coord = gl_PointCoord - vec2(0.5);
 		float dist = length(coord);
 		if (dist > 0.5) discard;
-		// Draw white ring around locked items, keep original color inside
-		if (v_isLocked > 0.5 && dist > 0.35) {
+		if (v_isLocked > 0.5 && dist > 0.34) {
 			gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
 		} else {
 			gl_FragColor = vec4(v_color, 1.0);
 		}
+	}
+`;
+
+const lineVertexShader = `
+	attribute vec2 a_position;
+	uniform vec2 u_resolution;
+	uniform vec2 u_translation;
+	uniform float u_scale;
+	void main() {
+		vec2 screen = a_position * u_scale + u_translation + u_resolution * 0.5;
+		vec2 clip = screen / u_resolution * 2.0 - 1.0;
+		gl_Position = vec4(clip.x, -clip.y, 0, 1);
+	}
+`;
+
+const lineFragmentShader = `
+	precision mediump float;
+	void main() {
+		gl_FragColor = vec4(1.0, 0.96, 0.84, 0.28);
 	}
 `;
 
@@ -68,7 +96,10 @@ function createShader(gl: WebGLRenderingContext, type: number, source: string): 
 	return shader;
 }
 
-function createProgram(gl: WebGLRenderingContext, vertexShader: WebGLShader, fragmentShader: WebGLShader): WebGLProgram | null {
+function createProgram(gl: WebGLRenderingContext, vertexSource: string, fragmentSource: string): WebGLProgram | null {
+	const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexSource);
+	const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
+	if (!vertexShader || !fragmentShader) return null;
 	const program = gl.createProgram();
 	if (!program) return null;
 	gl.attachShader(program, vertexShader);
@@ -82,374 +113,309 @@ function createProgram(gl: WebGLRenderingContext, vertexShader: WebGLShader, fra
 	return program;
 }
 
-// Convert HSL to RGB
-function hslToRgb(h: number, s: number, l: number): [number, number, number] {
-	s /= 100;
-	l /= 100;
-	const k = (n: number) => (n + h / 30) % 12;
-	const a = s * Math.min(l, 1 - l);
-	const f = (n: number) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
-	return [f(0), f(8), f(4)];
+function hexToRgb(hex: string): [number, number, number] {
+	const value = hex.replace('#', '');
+	const integer = Number.parseInt(value, 16);
+	return [((integer >> 16) & 255) / 255, ((integer >> 8) & 255) / 255, (integer & 255) / 255];
 }
 
-export default function Cloud({ data, showFilters, onToggleFilters }: CloudProps) {
+function decodePoints(payload: CloudPointsPayload): CloudPoint[] {
+	return payload.points.map((row) => ({
+		collection: row[0],
+		itemId: row[1],
+		x: row[2],
+		y: row[3],
+		duplicateCount: row[4],
+		neighbours: row.slice(5),
+	}));
+}
+
+function pointKey(collections: CloudCollection[], point: CloudPoint): string {
+	return `${collections[point.collection]?.slug ?? point.collection}:${point.itemId}`;
+}
+
+function setTransformUniforms(
+	gl: WebGLRenderingContext,
+	program: WebGLProgram,
+	width: number,
+	height: number,
+	transform: { x: number; y: number; scale: number }
+) {
+	gl.uniform2f(gl.getUniformLocation(program, 'u_resolution'), width, height);
+	gl.uniform2f(gl.getUniformLocation(program, 'u_translation'), transform.x, transform.y);
+	gl.uniform1f(gl.getUniformLocation(program, 'u_scale'), transform.scale);
+}
+
+export default function Cloud({ showFilters }: CloudProps) {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const glRef = useRef<WebGLRenderingContext | null>(null);
-	const programRef = useRef<WebGLProgram | null>(null);
-	const buffersRef = useRef<{ position: WebGLBuffer | null; color: WebGLBuffer | null; size: WebGLBuffer | null; isLocked: WebGLBuffer | null }>({ position: null, color: null, size: null, isLocked: null });
-	const [hoveredItem, setHoveredItem] = useState<CloudDataItem | null>(null);
-	const [lockedItem, setLockedItem] = useState<CloudDataItem | null>(null);
-	const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
+	const pointProgramRef = useRef<WebGLProgram | null>(null);
+	const lineProgramRef = useRef<WebGLProgram | null>(null);
+	const buffersRef = useRef<Buffers>({ position: null, color: null, size: null, isLocked: null, connections: null });
+	const pointsRef = useRef<RenderPoint[]>([]);
+
+	const [graph, setGraph] = useState<{ points: CloudPoint[]; collections: CloudCollection[]; algorithm: CloudPointsPayload['algorithm'] } | null>(null);
+	const [metadata, setMetadata] = useState<CloudMetadataPayload | null>(null);
+	const [loadError, setLoadError] = useState('');
+	const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+	const [lockedIndex, setLockedIndex] = useState<number | null>(null);
+	const [transform, setTransform] = useState({ x: 0, y: 0, scale: 0.72 });
 	const [isDragging, setIsDragging] = useState(false);
 	const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 	const [clickStart, setClickStart] = useState<{ x: number; y: number } | null>(null);
 	const [activeFilters, setActiveFilters] = useState<Filter[]>([]);
 	const [searchTerm, setSearchTerm] = useState('');
-	const pointsRef = useRef<Point[]>([]);
 
-	// Extract unique authors, books, and religions for filtering
-	const authors = Array.from(new Set(data.map((d) => d.author).filter((a): a is string => typeof a === 'string' && a.length > 0))).sort();
-	const books = Array.from(new Set(data.map((d) => d.book).filter((b): b is string => typeof b === 'string' && b.length > 0))).sort();
-	const religions = Array.from(new Set(data.map((d) => d.religion).filter((r): r is string => typeof r === 'string' && r.length > 0))).sort();
-
-	// Parse data into 2D points and center the cloud
 	useEffect(() => {
-		const points: Point[] = [];
-		let minX = Infinity, maxX = -Infinity;
-		let minY = Infinity, maxY = -Infinity;
+		const controller = new AbortController();
+		const loadGraph = async () => {
+			try {
+				const response = await fetch('/cloud-points.json', { signal: controller.signal });
+				if (!response.ok) throw new Error(`Point graph returned ${response.status}`);
+				const payload = (await response.json()) as CloudPointsPayload;
+				setGraph({ points: decodePoints(payload), collections: payload.collections, algorithm: payload.algorithm });
+			} catch (error) {
+				if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : 'Could not load the point graph');
+			}
+		};
+		const loadMetadata = async () => {
+			try {
+				const response = await fetch('/cloud-metadata.json', { signal: controller.signal });
+				if (!response.ok) throw new Error(`Metadata returned ${response.status}`);
+				setMetadata((await response.json()) as CloudMetadataPayload);
+			} catch (error) {
+				if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : 'Could not load cloud metadata');
+			}
+		};
+		void loadGraph();
+		void loadMetadata();
+		return () => controller.abort();
+	}, []);
 
-		data.forEach((item) => {
-			const x = item.x * 20;
-			const y = item.y * 20;
-			points.push({ x, y, item });
-			minX = Math.min(minX, x);
-			maxX = Math.max(maxX, x);
-			minY = Math.min(minY, y);
-			maxY = Math.max(maxY, y);
-		});
+	const filterValues = useMemo(() => {
+		if (!graph || !metadata) return { authors: [] as string[], books: [] as string[], religions: [] as string[] };
+		return {
+			authors: Array.from(new Set(metadata.items.map((item) => item[1]).filter(Boolean))).sort(),
+			books: Array.from(new Set(metadata.items.map((item) => item[2]).filter(Boolean))).sort(),
+			religions: graph.collections.map((collection) => collection.label).sort(),
+		};
+	}, [graph, metadata]);
 
-		if (points.length > 0) {
-			const centerX = (minX + maxX) / 2;
-			const centerY = (minY + maxY) / 2;
-			points.forEach((p) => {
-				p.x -= centerX;
-				p.y -= centerY;
-			});
-		}
+	useEffect(() => {
+		if (!graph) return;
+		pointsRef.current = graph.points.map((point, index) => ({ index, x: point.x * POINT_SCALE, y: point.y * POINT_SCALE, point }));
+	}, [graph]);
 
-		pointsRef.current = points;
-	}, [data]);
-
-	// Check if a point matches active filters
 	const matchesFilters = useCallback(
-		(item: CloudDataItem) => {
-			if (activeFilters.length === 0) return true;
-			return activeFilters.some((filter) => {
-				if (filter.type === 'author') return item.author === filter.value;
-				if (filter.type === 'book') return item.book === filter.value;
-				if (filter.type === 'religion') return item.religion === filter.value;
-				return false;
+		(index: number) => {
+			if (!graph || !metadata || activeFilters.length === 0) return true;
+			const point = graph.points[index];
+			const item = metadata.items[index];
+			return activeFilters.every((filter) => {
+				if (filter.type === 'author') return item?.[1] === filter.value;
+				if (filter.type === 'book') return item?.[2] === filter.value;
+				return graph.collections[point.collection]?.label === filter.value;
 			});
 		},
-		[activeFilters]
+		[activeFilters, graph, metadata]
 	);
 
-	// Initialize WebGL
 	useEffect(() => {
 		const canvas = canvasRef.current;
 		if (!canvas) return;
-
 		const gl = canvas.getContext('webgl', { antialias: true });
 		if (!gl) {
-			console.error('WebGL not supported');
+			setLoadError('WebGL is not available in this browser');
 			return;
 		}
 		glRef.current = gl;
-
-		const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
-		const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
-		if (!vertexShader || !fragmentShader) return;
-
-		const program = createProgram(gl, vertexShader, fragmentShader);
-		if (!program) return;
-		programRef.current = program;
-
+		pointProgramRef.current = createProgram(gl, pointVertexShader, pointFragmentShader);
+		lineProgramRef.current = createProgram(gl, lineVertexShader, lineFragmentShader);
 		buffersRef.current = {
 			position: gl.createBuffer(),
 			color: gl.createBuffer(),
 			size: gl.createBuffer(),
 			isLocked: gl.createBuffer(),
+			connections: gl.createBuffer(),
 		};
-
 		gl.enable(gl.BLEND);
 		gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 	}, []);
 
-	// Update buffers when filters or locked item change
 	useEffect(() => {
 		const gl = glRef.current;
-		if (!gl || !buffersRef.current.position) return;
-
+		if (!gl || !graph || !buffersRef.current.position) return;
 		const points = pointsRef.current;
-		const hasFilters = activeFilters.length > 0;
-
 		const positions = new Float32Array(points.length * 2);
 		const colors = new Float32Array(points.length * 3);
 		const sizes = new Float32Array(points.length);
-		const isLockedArr = new Float32Array(points.length);
+		const isLocked = new Float32Array(points.length);
+		const related = new Set(lockedIndex === null ? [] : graph.points[lockedIndex]?.neighbours);
+		const hasFilters = activeFilters.length > 0;
 
-		points.forEach((point, i) => {
-			positions[i * 2] = point.x;
-			positions[i * 2 + 1] = point.y;
-
-			const matches = matchesFilters(point.item);
-			const isLocked = lockedItem && point.item.id === lockedItem.id;
-			const hue = (i * 137.508) % 360;
-
-			isLockedArr[i] = isLocked ? 1.0 : 0.0;
-
-			if (isLocked) {
-				// Keep original color, shader will add white ring
-				const [r, g, b] = hslToRgb(hue, 65, 55);
-				colors[i * 3] = r;
-				colors[i * 3 + 1] = g;
-				colors[i * 3 + 2] = b;
-				sizes[i] = 24.0;
-			} else if (hasFilters && !matches) {
-				colors[i * 3] = 0.16;
-				colors[i * 3 + 1] = 0.16;
-				colors[i * 3 + 2] = 0.2;
-				sizes[i] = 6.0;
-			} else if (hasFilters && matches) {
-				colors[i * 3] = 0.77;
-				colors[i * 3 + 1] = 0.77;
-				colors[i * 3 + 2] = 1.0;
-				sizes[i] = 15.0;
+		points.forEach((renderPoint, index) => {
+			positions[index * 2] = renderPoint.x;
+			positions[index * 2 + 1] = renderPoint.y;
+			const collection = graph.collections[renderPoint.point.collection];
+			const base = hexToRgb(collection?.colour ?? '#777777');
+			const selected = lockedIndex === index;
+			const neighbour = related.has(index);
+			const matches = matchesFilters(index);
+			isLocked[index] = selected ? 1 : 0;
+			if (hasFilters && !matches) {
+				colors.set([0.12, 0.12, 0.14], index * 3);
+				sizes[index] = 4;
+			} else if (selected) {
+				colors.set(base, index * 3);
+				sizes[index] = 25;
+			} else if (neighbour) {
+				colors.set([0.96, 0.91, 0.76], index * 3);
+				sizes[index] = 15;
 			} else {
-				const [r, g, b] = hslToRgb(hue, 65, 55);
-				colors[i * 3] = r;
-				colors[i * 3 + 1] = g;
-				colors[i * 3 + 2] = b;
-				sizes[i] = 9.0;
+				colors.set(base, index * 3);
+				sizes[index] = hasFilters ? 13 : 8;
 			}
 		});
 
 		gl.bindBuffer(gl.ARRAY_BUFFER, buffersRef.current.position);
 		gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
-
 		gl.bindBuffer(gl.ARRAY_BUFFER, buffersRef.current.color);
 		gl.bufferData(gl.ARRAY_BUFFER, colors, gl.STATIC_DRAW);
-
 		gl.bindBuffer(gl.ARRAY_BUFFER, buffersRef.current.size);
 		gl.bufferData(gl.ARRAY_BUFFER, sizes, gl.STATIC_DRAW);
-
 		gl.bindBuffer(gl.ARRAY_BUFFER, buffersRef.current.isLocked);
-		gl.bufferData(gl.ARRAY_BUFFER, isLockedArr, gl.STATIC_DRAW);
-	}, [activeFilters, matchesFilters, data, lockedItem]);
+		gl.bufferData(gl.ARRAY_BUFFER, isLocked, gl.STATIC_DRAW);
 
-	// Draw with WebGL
+		const locked = lockedIndex === null ? null : points[lockedIndex];
+		const connectionPositions = locked
+			? new Float32Array(
+					locked.point.neighbours.flatMap((neighbourIndex) => {
+						const neighbour = points[neighbourIndex];
+						return neighbour ? [locked.x, locked.y, neighbour.x, neighbour.y] : [];
+					})
+			  )
+			: new Float32Array();
+		gl.bindBuffer(gl.ARRAY_BUFFER, buffersRef.current.connections);
+		gl.bufferData(gl.ARRAY_BUFFER, connectionPositions, gl.STATIC_DRAW);
+	}, [activeFilters, graph, lockedIndex, matchesFilters, metadata]);
+
 	const draw = useCallback(() => {
 		const gl = glRef.current;
-		const program = programRef.current;
 		const canvas = canvasRef.current;
-		if (!gl || !program || !canvas || !buffersRef.current.position) return;
-
-		const { width, height } = canvas;
-		gl.viewport(0, 0, width, height);
+		const pointProgram = pointProgramRef.current;
+		const lineProgram = lineProgramRef.current;
+		const buffers = buffersRef.current;
+		if (!gl || !canvas || !pointProgram || !lineProgram || !buffers.position) return;
+		gl.viewport(0, 0, canvas.width, canvas.height);
 		gl.clearColor(0, 0, 0, 1);
 		gl.clear(gl.COLOR_BUFFER_BIT);
 
-		gl.useProgram(program);
+		if (lockedIndex !== null && buffers.connections) {
+			gl.useProgram(lineProgram);
+			setTransformUniforms(gl, lineProgram, canvas.width, canvas.height, transform);
+			const position = gl.getAttribLocation(lineProgram, 'a_position');
+			gl.bindBuffer(gl.ARRAY_BUFFER, buffers.connections);
+			gl.enableVertexAttribArray(position);
+			gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+			gl.drawArrays(gl.LINES, 0, (graph?.points[lockedIndex]?.neighbours.length ?? 0) * 2);
+		}
 
-		// Set uniforms
-		const resolutionLoc = gl.getUniformLocation(program, 'u_resolution');
-		const translationLoc = gl.getUniformLocation(program, 'u_translation');
-		const scaleLoc = gl.getUniformLocation(program, 'u_scale');
-
-		gl.uniform2f(resolutionLoc, width / 2, height / 2);
-		gl.uniform2f(translationLoc, transform.x, transform.y);
-		gl.uniform1f(scaleLoc, transform.scale);
-
-		// Position attribute
-		const positionLoc = gl.getAttribLocation(program, 'a_position');
-		gl.bindBuffer(gl.ARRAY_BUFFER, buffersRef.current.position);
-		gl.enableVertexAttribArray(positionLoc);
-		gl.vertexAttribPointer(positionLoc, 2, gl.FLOAT, false, 0, 0);
-
-		// Color attribute
-		const colorLoc = gl.getAttribLocation(program, 'a_color');
-		gl.bindBuffer(gl.ARRAY_BUFFER, buffersRef.current.color);
-		gl.enableVertexAttribArray(colorLoc);
-		gl.vertexAttribPointer(colorLoc, 3, gl.FLOAT, false, 0, 0);
-
-		// Size attribute
-		const sizeLoc = gl.getAttribLocation(program, 'a_size');
-		gl.bindBuffer(gl.ARRAY_BUFFER, buffersRef.current.size);
-		gl.enableVertexAttribArray(sizeLoc);
-		gl.vertexAttribPointer(sizeLoc, 1, gl.FLOAT, false, 0, 0);
-
-		// IsLocked attribute
-		const isLockedLoc = gl.getAttribLocation(program, 'a_isLocked');
-		gl.bindBuffer(gl.ARRAY_BUFFER, buffersRef.current.isLocked);
-		gl.enableVertexAttribArray(isLockedLoc);
-		gl.vertexAttribPointer(isLockedLoc, 1, gl.FLOAT, false, 0, 0);
-
+		gl.useProgram(pointProgram);
+		setTransformUniforms(gl, pointProgram, canvas.width, canvas.height, transform);
+		const attributes = [
+			['a_position', buffers.position, 2],
+			['a_color', buffers.color, 3],
+			['a_size', buffers.size, 1],
+			['a_isLocked', buffers.isLocked, 1],
+		] as const;
+		attributes.forEach(([name, buffer, size]) => {
+			const location = gl.getAttribLocation(pointProgram, name);
+			gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+			gl.enableVertexAttribArray(location);
+			gl.vertexAttribPointer(location, size, gl.FLOAT, false, 0, 0);
+		});
 		gl.drawArrays(gl.POINTS, 0, pointsRef.current.length);
-	}, [transform]);
+	}, [graph, lockedIndex, transform]);
 
-	// Resize handler
 	useEffect(() => {
 		const canvas = canvasRef.current;
 		if (!canvas) return;
-
 		const resize = () => {
 			canvas.width = window.innerWidth;
 			canvas.height = window.innerHeight;
 			draw();
 		};
-
 		resize();
 		window.addEventListener('resize', resize);
 		return () => window.removeEventListener('resize', resize);
 	}, [draw]);
 
-	// Draw on transform change or selection change
-	useEffect(() => {
-		draw();
-	}, [draw, transform, activeFilters, lockedItem]);
+	useEffect(() => draw(), [activeFilters, draw, graph, lockedIndex, metadata]);
 
-	// Find point at mouse position
-	const findPointAtMouse = useCallback((e: React.MouseEvent): Point | null => {
-		const canvas = canvasRef.current;
-		if (!canvas) return null;
-
-		const rect = canvas.getBoundingClientRect();
-		// Scale mouse coordinates from CSS pixels to canvas buffer pixels
-		const scaleX = canvas.width / rect.width;
-		const scaleY = canvas.height / rect.height;
-		const canvasX = (e.clientX - rect.left) * scaleX;
-		const canvasY = (e.clientY - rect.top) * scaleY;
-
-		// Convert to world coordinates (inverse of shader transform)
-		// Shader does: clip = (pos * scale + translation) / (resolution) * 2
-		// where resolution = (width/2, height/2)
-		// So: clip = (pos * scale + translation) * 4 / dimensions
-		// Screen center (dimensions/2) maps to clip=0, so:
-		// worldX * scale + transform.x = (screenX - width/2) / 2
-		const mouseX = (canvasX - canvas.width / 2) / 2 - transform.x;
-		const mouseY = (canvasY - canvas.height / 2) / 2 - transform.y;
-
-		let closest: Point | null = null;
-		let closestDist = Infinity;
-		const threshold = 80 / transform.scale;
-
-		for (const point of pointsRef.current) {
-			const dx = point.x * transform.scale - mouseX;
-			const dy = point.y * transform.scale - mouseY;
-			const dist = Math.sqrt(dx * dx + dy * dy);
-			if (dist < threshold && dist < closestDist) {
-				closest = point;
-				closestDist = dist;
-			}
-		}
-
-		return closest;
-	}, [transform]);
-
-	// Mouse handlers
-	const handleMouseDown = (e: React.MouseEvent) => {
-		setIsDragging(true);
-		setDragStart({ x: e.clientX - transform.x, y: e.clientY - transform.y });
-		setClickStart({ x: e.clientX, y: e.clientY });
-	};
-
-	const handleMouseMove = (e: React.MouseEvent) => {
-		if (isDragging) {
-			setTransform((prev) => ({
-				...prev,
-				x: e.clientX - dragStart.x,
-				y: e.clientY - dragStart.y,
-			}));
-		} else {
-			// Check for hover (only update if no locked item)
-			const closest = findPointAtMouse(e);
-			setHoveredItem(closest?.item || null);
-		}
-	};
-
-	const handleMouseUp = (e: React.MouseEvent) => {
-		// Check if this was a click (not a drag)
-		if (clickStart) {
-			const dx = e.clientX - clickStart.x;
-			const dy = e.clientY - clickStart.y;
-			const distance = Math.sqrt(dx * dx + dy * dy);
-
-			if (distance < 5) {
-				// This was a click, not a drag
-				const closest = findPointAtMouse(e);
-				if (closest) {
-					// Toggle lock on this item
-					if (lockedItem && lockedItem.id === closest.item.id) {
-						setLockedItem(null);
-					} else {
-						setLockedItem(closest.item);
-					}
-				} else {
-					// Clicked empty space, unlock
-					setLockedItem(null);
+	const findPointAtMouse = useCallback(
+		(event: React.MouseEvent): RenderPoint | null => {
+			const canvas = canvasRef.current;
+			if (!canvas) return null;
+			const rect = canvas.getBoundingClientRect();
+			const screenX = event.clientX - rect.left - rect.width / 2;
+			const screenY = event.clientY - rect.top - rect.height / 2;
+			const worldX = (screenX - transform.x) / transform.scale;
+			const worldY = (screenY - transform.y) / transform.scale;
+			const threshold = 13 / transform.scale;
+			let closest: RenderPoint | null = null;
+			let closestDistance = Infinity;
+			for (const point of pointsRef.current) {
+				const distance = Math.hypot(point.x - worldX, point.y - worldY);
+				if (distance < threshold && distance < closestDistance) {
+					closest = point;
+					closestDistance = distance;
 				}
 			}
+			return closest;
+		},
+		[transform]
+	);
+
+	const handleMouseDown = (event: React.MouseEvent) => {
+		setIsDragging(true);
+		setDragStart({ x: event.clientX - transform.x, y: event.clientY - transform.y });
+		setClickStart({ x: event.clientX, y: event.clientY });
+	};
+
+	const handleMouseMove = (event: React.MouseEvent) => {
+		if (isDragging) {
+			setTransform((previous) => ({ ...previous, x: event.clientX - dragStart.x, y: event.clientY - dragStart.y }));
+		} else {
+			setHoveredIndex(findPointAtMouse(event)?.index ?? null);
 		}
+	};
 
+	const handleMouseUp = (event: React.MouseEvent) => {
+		if (clickStart && Math.hypot(event.clientX - clickStart.x, event.clientY - clickStart.y) < 5) {
+			const closest = findPointAtMouse(event);
+			setLockedIndex((current) => (closest ? (current === closest.index ? null : closest.index) : null));
+		}
 		setIsDragging(false);
 		setClickStart(null);
 	};
 
-	const handleMouseLeave = () => {
-		setIsDragging(false);
-		setClickStart(null);
-	};
-
-	const handleWheel = (e: React.WheelEvent) => {
-		e.preventDefault();
+	const handleWheel = (event: React.WheelEvent) => {
+		event.preventDefault();
 		const canvas = canvasRef.current;
 		if (!canvas) return;
-
 		const rect = canvas.getBoundingClientRect();
-		// Scale mouse coordinates from CSS pixels to canvas buffer pixels
-		const scaleX = canvas.width / rect.width;
-		const scaleY = canvas.height / rect.height;
-		const canvasX = (e.clientX - rect.left) * scaleX;
-		const canvasY = (e.clientY - rect.top) * scaleY;
-
-		// Convert to world space (matching shader transform)
-		const mouseX = (canvasX - canvas.width / 2) / 2;
-		const mouseY = (canvasY - canvas.height / 2) / 2;
-
-		const scaleFactor = e.deltaY > 0 ? 0.9 : 1.1;
-		const newScale = Math.max(0.1, Math.min(100, transform.scale * scaleFactor));
-
-		const scaleRatio = newScale / transform.scale;
-		const newX = mouseX - (mouseX - transform.x) * scaleRatio;
-		const newY = mouseY - (mouseY - transform.y) * scaleRatio;
-
-		setTransform({
-			x: newX,
-			y: newY,
-			scale: newScale,
-		});
+		const screenX = event.clientX - rect.left - rect.width / 2;
+		const screenY = event.clientY - rect.top - rect.height / 2;
+		const nextScale = Math.max(0.15, Math.min(16, transform.scale * (event.deltaY > 0 ? 0.9 : 1.1)));
+		const worldX = (screenX - transform.x) / transform.scale;
+		const worldY = (screenY - transform.y) / transform.scale;
+		setTransform({ x: screenX - worldX * nextScale, y: screenY - worldY * nextScale, scale: nextScale });
 	};
 
-	// The item to display (locked takes priority over hovered)
-	const displayItem = lockedItem || hoveredItem;
-
 	const toggleFilter = (type: Filter['type'], value: string) => {
-		setActiveFilters((prev) => {
-			const exists = prev.some((f) => f.type === type && f.value === value);
-			if (exists) {
-				return prev.filter((f) => !(f.type === type && f.value === value));
-			}
-			return [...prev, { type, value }];
+		setActiveFilters((previous) => {
+			const exists = previous.some((filter) => filter.type === type && filter.value === value);
+			return exists ? previous.filter((filter) => !(filter.type === type && filter.value === value)) : [...previous, { type, value }];
 		});
 	};
 
@@ -458,153 +424,152 @@ export default function Cloud({ data, showFilters, onToggleFilters }: CloudProps
 		setSearchTerm('');
 	};
 
-	const filteredAuthors = authors.filter((a) => a.toLowerCase().includes(searchTerm.toLowerCase()));
-	const filteredBooks = books.filter((b) => b.toLowerCase().includes(searchTerm.toLowerCase()));
-	const filteredReligions = religions.filter((r) => r.toLowerCase().includes(searchTerm.toLowerCase()));
+	const displayIndex = lockedIndex ?? hoveredIndex;
+	const displayPoint = displayIndex === null ? null : graph?.points[displayIndex];
+	const displayMetadata = displayIndex === null ? null : metadata?.items[displayIndex];
+	const displayCollection = displayPoint ? graph?.collections[displayPoint.collection] : null;
+	const search = searchTerm.toLowerCase();
+	const filteredAuthors = filterValues.authors.filter((value) => value.toLowerCase().includes(search));
+	const filteredBooks = filterValues.books.filter((value) => value.toLowerCase().includes(search));
+	const filteredReligions = filterValues.religions.filter((value) => value.toLowerCase().includes(search));
 
 	return (
-		<div className="w-full h-screen relative bg-black">
+		<div className="relative h-screen w-full bg-black antialiased">
 			<canvas
 				ref={canvasRef}
-				className="w-full h-full cursor-crosshair"
+				className="h-full w-full cursor-crosshair"
 				onMouseDown={handleMouseDown}
 				onMouseMove={handleMouseMove}
 				onMouseUp={handleMouseUp}
-				onMouseLeave={handleMouseLeave}
+				onMouseLeave={() => {
+					setIsDragging(false);
+					setClickStart(null);
+				}}
 				onWheel={handleWheel}
 			/>
 
-			{/* Filter panel */}
+			{!graph && !loadError && (
+				<div className="pointer-events-none fixed inset-0 grid place-items-center text-[10px] font-mono uppercase tracking-[0.22em] text-white/45">
+					Mapping the corpus…
+				</div>
+			)}
+			{loadError && (
+				<div className="fixed left-4 top-4 max-w-sm bg-[#b91c1c] p-4 text-xs text-white shadow-[0_0_0_1px_rgba(255,255,255,0.12)]">
+					Could not load the cloud: {loadError}
+				</div>
+			)}
+
+			{graph && (
+				<div className="pointer-events-none fixed left-4 top-4 z-40 font-mono text-[10px] uppercase tracking-[0.16em] text-white/40">
+					<p className="tabular-nums">{graph.points.length.toLocaleString()} unique texts</p>
+					<p>{graph.algorithm.family} · semantic neighbours</p>
+				</div>
+			)}
+
 			{showFilters && (
-				<div className="fixed top-16 right-4 z-50 bg-black/95 border border-white/10 backdrop-blur-sm p-4 rounded-lg max-w-xs w-80 max-h-[70vh] overflow-hidden flex flex-col">
-					<div className="flex items-center justify-between mb-3">
-						<span className="text-white font-mono text-xs tracking-wider uppercase">FILTERS</span>
+				<div className="fixed right-4 top-16 z-50 flex max-h-[72vh] w-80 flex-col bg-black/95 p-4 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.12)] backdrop-blur-sm">
+					<div className="mb-3 flex items-center justify-between">
+						<span className="font-mono text-xs uppercase tracking-[0.18em]">Filters</span>
 						{activeFilters.length > 0 && (
-							<button onClick={clearFilters} className="text-white/60 hover:text-accent text-[10px] font-mono tracking-wider uppercase transition-colors">
-								CLEAR ALL
+							<button onClick={clearFilters} className="min-h-10 px-2 font-mono text-[10px] uppercase tracking-wider text-white/60 transition-colors duration-150 hover:text-white active:scale-[0.96]">
+								Clear all
 							</button>
 						)}
 					</div>
-
 					<input
-						type="text"
-						placeholder="SEARCH..."
+						type="search"
+						placeholder="SEARCH AUTHORS OR BOOKS"
 						value={searchTerm}
-						onChange={(e) => setSearchTerm(e.target.value)}
-						className="w-full px-3 py-2 bg-white/5 border border-white/20 rounded text-white text-xs font-mono mb-3 placeholder-white/30 focus:border-accent focus:outline-none transition-colors"
+						onChange={(event) => setSearchTerm(event.target.value)}
+						className="mb-3 min-h-10 w-full border border-white/20 bg-white/5 px-3 py-2 font-mono text-xs text-white outline-none transition-colors duration-150 placeholder:text-white/30 focus:border-white/60"
 					/>
-
-					<div className="flex-1 overflow-y-auto space-y-4">
-						{/* Active filters */}
+					<div className="flex-1 space-y-4 overflow-y-auto">
 						{activeFilters.length > 0 && (
-							<div className="flex flex-wrap gap-2 pb-3 border-b border-white/10">
-								{activeFilters.map((filter, i) => (
-									<button
-										key={i}
-										onClick={() => toggleFilter(filter.type, filter.value)}
-										className="bg-accent text-white px-2 py-1 rounded text-[10px] font-mono tracking-wide flex items-center gap-1 hover:bg-accent/80 transition-colors">
-										{filter.value.toUpperCase()}
-										<span className="opacity-70">×</span>
+							<div className="flex flex-wrap gap-2 border-b border-white/10 pb-3">
+								{activeFilters.map((filter) => (
+									<button key={`${filter.type}:${filter.value}`} onClick={() => toggleFilter(filter.type, filter.value)} className="min-h-10 bg-white px-3 py-2 font-mono text-[10px] uppercase tracking-wide text-black transition-[scale,background-color] duration-150 hover:bg-[#f0e7cf] active:scale-[0.96]">
+										{filter.value} ×
 									</button>
 								))}
 							</div>
 						)}
 
-						{/* Religions */}
-						{filteredReligions.length > 0 && (
-							<div>
-								<p className="text-white/50 text-[10px] font-mono tracking-wider uppercase mb-2">RELIGION</p>
-								<div className="space-y-0.5 max-h-32 overflow-y-auto">
-									{filteredReligions.map((religion) => (
-										<button
-											key={religion}
-											onClick={() => toggleFilter('religion', religion)}
-											className={`block w-full text-left px-2 py-1.5 rounded text-xs font-mono transition-colors ${
-												activeFilters.some((f) => f.type === 'religion' && f.value === religion)
-													? 'bg-accent text-white'
-													: 'text-white/70 hover:bg-white/5 hover:text-white'
-											}`}>
-											{religion}
-										</button>
-									))}
-								</div>
-							</div>
-						)}
-
-						{/* Authors */}
-						<div>
-							<p className="text-white/50 text-[10px] font-mono tracking-wider uppercase mb-2">AUTHORS</p>
-							<div className="space-y-0.5 max-h-40 overflow-y-auto">
-								{filteredAuthors.slice(0, 50).map((author) => (
-									<button
-										key={author}
-										onClick={() => toggleFilter('author', author)}
-										className={`block w-full text-left px-2 py-1.5 rounded text-xs font-mono transition-colors ${
-											activeFilters.some((f) => f.type === 'author' && f.value === author)
-												? 'bg-accent text-white'
-												: 'text-white/70 hover:bg-white/5 hover:text-white'
-										}`}>
-										{author}
-									</button>
-								))}
-								{filteredAuthors.length > 50 && (
-									<p className="text-white/30 text-[10px] font-mono px-2 py-1">+{filteredAuthors.length - 50} MORE</p>
-								)}
-							</div>
-						</div>
-
-						{/* Books */}
-						<div>
-							<p className="text-white/50 text-[10px] font-mono tracking-wider uppercase mb-2">BOOKS</p>
-							<div className="space-y-0.5 max-h-40 overflow-y-auto">
-								{filteredBooks.slice(0, 50).map((book) => (
-									<button
-										key={book}
-										onClick={() => toggleFilter('book', book)}
-										className={`block w-full text-left px-2 py-1.5 rounded text-xs font-mono transition-colors ${
-											activeFilters.some((f) => f.type === 'book' && f.value === book)
-												? 'bg-accent text-white'
-												: 'text-white/70 hover:bg-white/5 hover:text-white'
-										}`}>
-										{book}
-									</button>
-								))}
-								{filteredBooks.length > 50 && (
-									<p className="text-white/30 text-[10px] font-mono px-2 py-1">+{filteredBooks.length - 50} MORE</p>
-								)}
-							</div>
-						</div>
+						<FilterGroup label="Traditions" values={filteredReligions} activeFilters={activeFilters} type="religion" onToggle={toggleFilter} />
+						<FilterGroup label="Authors" values={filteredAuthors.slice(0, 50)} overflow={filteredAuthors.length - 50} activeFilters={activeFilters} type="author" onToggle={toggleFilter} />
+						<FilterGroup label="Books" values={filteredBooks.slice(0, 50)} overflow={filteredBooks.length - 50} activeFilters={activeFilters} type="book" onToggle={toggleFilter} />
 					</div>
 				</div>
 			)}
 
-			{/* Selected quote */}
-			{displayItem && (
-				<div className="fixed bottom-4 right-4 z-40 bg-black/95 border border-white/10 backdrop-blur-sm p-5 rounded-lg max-w-md text-white">
-					{displayItem.religion && (
-						<button
-							onClick={() => displayItem.religion && toggleFilter('religion', displayItem.religion)}
-							className="text-[10px] font-mono tracking-wider uppercase text-accent hover:text-accent2 transition-colors mb-2 block">
-							{displayItem.religion}
+			{graph && displayPoint && displayCollection && (
+				<aside className="fixed bottom-4 right-4 z-40 w-[min(28rem,calc(100vw-2rem))] min-w-0 overflow-hidden bg-black/95 p-5 text-white shadow-[0_0_0_1px_rgba(255,255,255,0.12)] backdrop-blur-sm">
+					<div className="mb-3 flex items-center justify-between gap-4 font-mono text-[10px] uppercase tracking-[0.16em]">
+						<button onClick={() => toggleFilter('religion', displayCollection.label)} className="min-h-10 text-left transition-colors duration-150 hover:text-white active:scale-[0.96]" style={{ color: displayCollection.colour }}>
+							{displayCollection.label}
 						</button>
-					)}
-					<p className="mb-4 text-sm leading-relaxed font-serif italic text-white/90">&ldquo;{displayItem.text}&rdquo;</p>
-					<div className="text-right">
-						<button
-							onClick={() => displayItem.author && toggleFilter('author', displayItem.author)}
-							className="text-xs font-mono tracking-wider uppercase hover:text-accent transition-colors">
-							{displayItem.author}
-						</button>
-						{displayItem.book && (
-							<button
-								onClick={() => toggleFilter('book', displayItem.book)}
-								className="text-xs font-mono text-white/50 ml-2 hover:text-accent transition-colors">
-								{displayItem.book}
-							</button>
-						)}
+						<span className="tabular-nums text-white/35">{pointKey(graph?.collections ?? [], displayPoint)}</span>
 					</div>
-				</div>
+					{displayMetadata ? (
+						<>
+							<p className="text-pretty font-serif text-sm italic leading-relaxed text-white/90">&ldquo;{displayMetadata[0]}&rdquo;</p>
+							<p className="mt-4 font-mono text-[10px] uppercase tracking-wider text-white/50">
+								{[displayMetadata[1], displayMetadata[2], displayMetadata[4]].filter(Boolean).join(' · ')}
+							</p>
+							{displayPoint.duplicateCount > 1 && <p className="mt-2 font-mono text-[10px] uppercase tracking-wider text-white/35">Represents {displayPoint.duplicateCount} duplicate records</p>}
+						</>
+					) : (
+						<p className="font-mono text-xs uppercase tracking-wider text-white/40">Loading text…</p>
+					)}
+
+					{lockedIndex !== null && metadata && (
+						<div className="mt-5 border-t border-white/10 pt-3">
+							<p className="mb-2 font-mono text-[9px] uppercase tracking-[0.18em] text-white/35">Closest in semantic space</p>
+							<div className="grid min-w-0 gap-px overflow-hidden bg-white/10">
+								{displayPoint.neighbours.slice(0, 3).map((neighbourIndex) => {
+									const neighbour = graph.points[neighbourIndex];
+									const neighbourMetadata = metadata.items[neighbourIndex];
+									const collection = graph.collections[neighbour.collection];
+									return (
+										<button key={pointKey(graph.collections, neighbour)} onClick={() => setLockedIndex(neighbourIndex)} className="min-h-10 min-w-0 overflow-hidden bg-black px-3 py-2 text-left transition-[scale,background-color] duration-150 hover:bg-white/10 active:scale-[0.96]">
+											<span className="block truncate font-serif text-xs text-white/75">{neighbourMetadata?.[0] ?? 'Loading text…'}</span>
+											<span className="mt-1 block font-mono text-[9px] uppercase tracking-wider" style={{ color: collection.colour }}>{collection.label}</span>
+										</button>
+									);
+								})}
+							</div>
+						</div>
+					)}
+				</aside>
 			)}
 		</div>
+	);
+}
+
+interface FilterGroupProps {
+	label: string;
+	values: string[];
+	overflow?: number;
+	activeFilters: Filter[];
+	type: Filter['type'];
+	onToggle: (type: Filter['type'], value: string) => void;
+}
+
+function FilterGroup({ label, values, overflow = 0, activeFilters, type, onToggle }: FilterGroupProps) {
+	if (values.length === 0) return null;
+	return (
+		<section>
+			<p className="mb-2 font-mono text-[10px] uppercase tracking-wider text-white/45">{label}</p>
+			<div className="max-h-40 overflow-y-auto">
+				{values.map((value) => {
+					const active = activeFilters.some((filter) => filter.type === type && filter.value === value);
+					return (
+						<button key={value} onClick={() => onToggle(type, value)} className={`block min-h-10 w-full px-2 py-2 text-left font-mono text-xs transition-[scale,background-color,color] duration-150 active:scale-[0.96] ${active ? 'bg-white text-black' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>
+							{value}
+						</button>
+					);
+				})}
+				{overflow > 0 && <p className="px-2 py-1 font-mono text-[10px] text-white/30">+{overflow} more</p>}
+			</div>
+		</section>
 	);
 }

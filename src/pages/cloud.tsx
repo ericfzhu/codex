@@ -2,17 +2,9 @@ import Cloud from '@/components/Cloud';
 import Link from 'next/link';
 import Head from 'next/head';
 
-import { GetStaticProps } from 'next';
-import fs from 'fs';
-import path from 'path';
 import React, { useState } from 'react';
-import { CloudDataItem } from '@/types';
 
-interface CloudPageProps {
-	data: CloudDataItem[];
-}
-
-export default function CloudPage({ data }: CloudPageProps) {
+export default function CloudPage() {
 	const [showFilters, setShowFilters] = useState(false);
 
 	return (
@@ -44,20 +36,8 @@ export default function CloudPage({ data }: CloudPageProps) {
 			</div>
 
 			<div className="flex flex-col items-center">
-				<Cloud data={data} showFilters={showFilters} onToggleFilters={() => setShowFilters(!showFilters)} />
+				<Cloud showFilters={showFilters} onToggleFilters={() => setShowFilters(!showFilters)} />
 			</div>
 		</main>
 	);
 }
-
-export const getStaticProps: GetStaticProps = async () => {
-	const jsonFilePath = path.join(process.cwd(), 'public', 'cloud-projections.json');
-	const jsonFile = fs.readFileSync(jsonFilePath, 'utf8');
-	const data = JSON.parse(jsonFile) as CloudDataItem[];
-
-	return {
-		props: {
-			data,
-		},
-	};
-};

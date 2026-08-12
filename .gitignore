@@ -33,6 +33,7 @@ public/*-embeddings.bin
 
 # misc
 .DS_Store
+__pycache__/
 *.pem
 
 # debug

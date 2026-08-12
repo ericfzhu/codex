@@ -6,15 +6,40 @@ export interface DataItem {
 	Religion?: string; // Optional religion/source field for filtering
 }
 
-export interface CloudDataItem {
-	id: number;
-	text: string;
-	author: string;
-	book: string;
-	source: string;
-	religion: string;
+export interface CloudCollection {
+	slug: string;
+	label: string;
+	colour: string;
+}
+
+export interface CloudPoint {
+	collection: number;
+	itemId: number;
 	x: number;
 	y: number;
+	duplicateCount: number;
+	neighbours: number[];
+}
+
+export interface CloudPointsPayload {
+	version: 2;
+	algorithm: {
+		key: string;
+		family: 'pacmap' | 'umap';
+		nNeighbors: number;
+		minDist: number | null;
+		seed: number;
+		semanticDimensions: number;
+	};
+	collections: CloudCollection[];
+	columns: string[];
+	points: number[][];
+}
+
+export interface CloudMetadataPayload {
+	version: 2;
+	columns: string[];
+	items: [text: string, author: string, book: string, source: string, reference: string][];
 }
 
 export interface VisualizationProps {

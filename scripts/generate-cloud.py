@@ -21,19 +21,18 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import re
 import time
 import unicodedata
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 import numpy as np
 import pacmap
 import umap
-from annoy import AnnoyIndex
+from pynndescent import NNDescent
 from scipy.stats import spearmanr
 from sklearn.decomposition import PCA
 from sklearn.manifold import trustworthiness
@@ -222,8 +221,45 @@ def stratified_sample(items: list[CorpusItem], size: int, seed: int) -> np.ndarr
     return np.sort(result)
 
 
-def project(matrix: np.ndarray, candidate: Candidate, seed: int, verbose: bool = False) -> np.ndarray:
+def approximate_knn(matrix: np.ndarray, count: int, seed: int, metric: str) -> np.ndarray:
+    """Build deterministic approximate neighbours without PaCMAP's Annoy dependency."""
+    index = NNDescent(
+        matrix,
+        n_neighbors=count + 1,
+        metric=metric,
+        n_trees=48,
+        n_iters=12,
+        max_candidates=60,
+        low_memory=True,
+        random_state=seed,
+        n_jobs=-1,
+        verbose=False,
+    )
+    indices, _ = index.neighbor_graph
+    neighbours = np.empty((len(matrix), count), dtype=np.int32)
+    for source, candidates in enumerate(indices):
+        selected = [int(candidate) for candidate in candidates if candidate >= 0 and candidate != source][:count]
+        if len(selected) < count:
+            selected.extend([source] * (count - len(selected)))
+        neighbours[source] = selected
+    return neighbours
+
+
+def project(
+    matrix: np.ndarray,
+    candidate: Candidate,
+    seed: int,
+    verbose: bool = False,
+    return_neighbours: bool = False,
+) -> tuple[np.ndarray, np.ndarray | None]:
     if candidate.family == "pacmap":
+        neighbours = approximate_knn(matrix, candidate.n_neighbors, seed, "euclidean")
+        pair_neighbors = np.column_stack(
+            (
+                np.repeat(np.arange(len(matrix), dtype=np.int32), candidate.n_neighbors),
+                neighbours.reshape(-1),
+            )
+        ).astype(np.int32, copy=False)
         model = pacmap.PaCMAP(
             n_components=2,
             n_neighbors=candidate.n_neighbors,
@@ -231,10 +267,12 @@ def project(matrix: np.ndarray, candidate: Candidate, seed: int, verbose: bool =
             FP_ratio=2.0,
             distance="euclidean",
             apply_pca=False,
+            pair_neighbors=pair_neighbors,
             random_state=seed,
             verbose=verbose,
         )
-        return np.asarray(model.fit_transform(matrix, init="pca"), dtype=np.float32)
+        coords = np.asarray(model.fit_transform(matrix, init="pca"), dtype=np.float32)
+        return coords, neighbours[:, :NEIGHBOUR_COUNT] if return_neighbours else None
 
     model = umap.UMAP(
         n_components=2,
@@ -248,7 +286,7 @@ def project(matrix: np.ndarray, candidate: Candidate, seed: int, verbose: bool =
         low_memory=True,
         verbose=verbose,
     )
-    return np.asarray(model.fit_transform(matrix), dtype=np.float32)
+    return np.asarray(model.fit_transform(matrix), dtype=np.float32), None
 
 
 def pair_sample(count: int, pair_count: int, seed: int) -> tuple[np.ndarray, np.ndarray]:
@@ -295,7 +333,7 @@ def benchmark(matrix: np.ndarray, items: list[CorpusItem], size: int, seed: int)
     for candidate in CANDIDATES:
         started = time.time()
         log(f"  {candidate.key}: projecting")
-        coords = project(sample, candidate, seed)
+        coords, _ = project(sample, candidate, seed)
         metrics = quality_metrics(sample, coords, seed)
         score = candidate_score(metrics)
         result = {
@@ -316,8 +354,8 @@ def benchmark(matrix: np.ndarray, items: list[CorpusItem], size: int, seed: int)
     log(f"  winner: {winner.key}")
 
     log(f"  {winner.key}: checking second-seed stability")
-    first = project(sample, winner, seed)
-    second = project(sample, winner, seed + 1)
+    first, _ = project(sample, winner, seed)
+    second, _ = project(sample, winner, seed + 1)
     left, right = pair_sample(len(sample), min(100_000, len(sample) * 20), seed + 2)
     first_distance = np.linalg.norm(first[left] - first[right], axis=1)
     second_distance = np.linalg.norm(second[left] - second[right], axis=1)
@@ -325,23 +363,14 @@ def benchmark(matrix: np.ndarray, items: list[CorpusItem], size: int, seed: int)
     return winner, results
 
 
-def semantic_neighbours(matrix: np.ndarray, count: int, seed: int) -> tuple[np.ndarray, dict[str, float]]:
-    dimensions = matrix.shape[1]
-    index = AnnoyIndex(dimensions, "angular")
-    index.set_seed(seed)
-    log(f"\nBuilding semantic neighbour index ({len(matrix):,} points, {dimensions} dimensions)…")
-    for i, vector in enumerate(matrix):
-        index.add_item(i, vector)
-    index.build(50, n_jobs=-1)
-
-    neighbours = np.empty((len(matrix), count), dtype=np.int32)
-    search_k = max(5_000, count * 500)
-    for i in range(len(matrix)):
-        found = index.get_nns_by_item(i, count + 1, search_k=search_k)
-        found = [candidate for candidate in found if candidate != i][:count]
-        if len(found) < count:
-            found.extend([i] * (count - len(found)))
-        neighbours[i] = found
+def semantic_neighbours(
+    matrix: np.ndarray,
+    count: int,
+    seed: int,
+    cached: np.ndarray | None = None,
+) -> tuple[np.ndarray, dict[str, float]]:
+    log(f"\nBuilding semantic neighbour index ({len(matrix):,} points, {matrix.shape[1]} dimensions)…")
+    neighbours = cached if cached is not None else approximate_knn(matrix, count, seed, "cosine")
 
     rng = np.random.default_rng(seed)
     validation_indices = np.sort(rng.choice(len(matrix), size=min(400, len(matrix)), replace=False))
@@ -353,8 +382,9 @@ def semantic_neighbours(matrix: np.ndarray, count: int, seed: int) -> tuple[np.n
         recalls.append(len(exact.intersection(neighbours[source])) / count)
     report = {
         "semanticNeighbourCount": count,
-        "annoyTrees": 50,
-        "annoySearchK": search_k,
+        "index": "PyNNDescent cosine on normalized PCA space",
+        "nTrees": 48,
+        "nIters": 12,
         "annRecallAt8": round(float(np.mean(recalls)), 6),
     }
     log(f"  approximate-neighbour recall@{count}: {report['annRecallAt8']:.4f}")
@@ -475,7 +505,7 @@ def main() -> None:
 
     log(f"\nProjecting the complete cleaned corpus with {winner.key}…")
     projection_started = time.time()
-    coords = project(semantic_matrix, winner, args.seed, args.verbose)
+    coords, projected_neighbours = project(semantic_matrix, winner, args.seed, args.verbose, return_neighbours=True)
     report["selected"] = {
         "key": winner.key,
         "family": winner.family,
@@ -485,7 +515,7 @@ def main() -> None:
         **quality_metrics(semantic_matrix, coords, args.seed),
     }
 
-    neighbours, neighbour_report = semantic_neighbours(semantic_matrix, NEIGHBOUR_COUNT, args.seed)
+    neighbours, neighbour_report = semantic_neighbours(semantic_matrix, NEIGHBOUR_COUNT, args.seed, projected_neighbours)
     report["neighbours"] = neighbour_report
     report["durationSeconds"] = round(time.time() - started, 2)
 
