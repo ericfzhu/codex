@@ -9,7 +9,9 @@ The deployed site has no application database or search API. Search data is gene
 - `*-cohere.json` contains display metadata.
 - `*-embeddings-int8*.bin` contains 1,024-dimensional, quantized embeddings in the same row order as the metadata.
 - Bible embeddings are split into multiple files to remain below Cloudflare Pages' per-file size limit.
-- `cloud-projections.json` contains the two-dimensional projection used by the WebGL cloud.
+- `cloud-points.json` contains compact two-dimensional coordinates and semantic-neighbor links for the WebGL cloud.
+- `cloud-metadata.json` contains the cloud's lazily loaded display text and source metadata.
+- `cloud-projection-metrics.json` records the projection benchmark and generation settings.
 
 The browser downloads an index when a collection is opened, performs similarity search locally, and caches downloaded metadata and embeddings in IndexedDB. Theme preference is stored in local storage. All files under `public/` should be treated as publicly downloadable.
 
@@ -33,9 +35,17 @@ Node 20 is required. AWS credentials are only needed when regenerating embedding
 
 ## Deployment
 
-Cloudflare Pages currently supplies the deployment settings outside this repository. Keep the dashboard's build command and output directory documented here when they change so that the deployment remains reproducible.
+The site is a pure static Next.js export. Use the **Next.js (Static HTML Export)** preset in Cloudflare Pages with:
 
-The application currently produces standard Next.js build output. If the site is moved to a pure static-export configuration, add `output: 'export'` to `next.config.mjs` and deploy the generated `out/` directory after verifying routing on Cloudflare Pages.
+```text
+Build command: yarn build
+Build output directory: out
+Root directory: /
+```
+
+Do not use `@cloudflare/next-on-pages`; the adapter is unnecessary for this client-side site. `.node-version` pins the Cloudflare build environment to the same Node 20 runtime declared in `package.json`.
+
+The build also removes locally generated, unquantized embedding files from `out/`. They are not tracked by Git and are not used by the deployed browser application.
 
 ## Data generation
 
